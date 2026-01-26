@@ -1,65 +1,300 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import React, { useState, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
+import Header from './components/header';
+import TabNavigation from './components/TabNavigation';
+import PartnershipTab from './components/PartnershipTab';
+import PageTab from './components/PageTab';
+import MasterTab from './components/MasterTab';
+import PKROpexTab from './components/PKROpexTab';
+import PivotTab from './components/PivotTab';
+import ReportTab from './components/ReportTab';
+import Modal from './components/Modal';
+
+export default function ProjectTracker() {
+  const [darkMode, setDarkMode] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState('pivot');
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [modalType, setModalType] = useState('');
+  const [editingItem, setEditingItem] = useState(null);
+
+  // Data states
+  const [projects, setProjects] = useState([]);
+  const [pages, setPages] = useState([]);
+  const [workflows, setWorkflows] = useState([]);
+  const [dailyProgress, setDailyProgress] = useState([]);
+  const [pkrOpex, setPkrOpex] = useState([]);
+  const [masterData, setMasterData] = useState({
+    pics: [],
+    branches: [],
+    prioritas: [],
+    statuses: [],
+    kodes: [],
+    bnps: [],
+    sos: [],
+    activityTypes: []
+  });
+
+  // Dark mode detection
+  useEffect(() => {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setDarkMode(isDark);
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => setDarkMode(e.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  // Load sidebar state from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    if (saved !== null) {
+      setSidebarCollapsed(saved === 'true');
+    }
+  }, []);
+
+  // Load active tab from localStorage
+  useEffect(() => {
+    const savedTab = localStorage.getItem('activeTab');
+    if (savedTab) {
+      setActiveTab(savedTab);
+    }
+  }, []);
+
+  // Save sidebar state to localStorage
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', sidebarCollapsed.toString());
+  }, [sidebarCollapsed]);
+
+  // Save active tab to localStorage
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
+
+  // Fetch all data on mount
+  useEffect(() => {
+    fetchAllData();
+  }, []);
+
+  const fetchAllData = async () => {
+    setLoading(true);
+    try {
+      const [projectsRes, pagesRes, workflowsRes, progressRes, pkrRes, masterRes] = await Promise.all([
+        fetch('/api/projects'),
+        fetch('/api/pages'),
+        fetch('/api/workflows'),
+        fetch('/api/daily-progress'),
+        fetch('/api/pkr-opex'),
+        fetch('/api/master')
+      ]);
+
+      const [projectsData, pagesData, workflowsData, progressData, pkrData, masterDataRes] = await Promise.all([
+        projectsRes.json(),
+        pagesRes.json(),
+        workflowsRes.json(),
+        progressRes.json(),
+        pkrRes.json(),
+        masterRes.json()
+      ]);
+
+      setProjects(projectsData);
+      setPages(pagesData);
+      setWorkflows(workflowsData);
+      setDailyProgress(progressData);
+      setPkrOpex(pkrData);
+      setMasterData(masterDataRes);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openModal = (type: string, item: any = null) => {
+    setModalType(type);
+    setEditingItem(item);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingItem(null);
+  };
+
+  const handleSubmit = async (formData: any) => {
+    setLoading(true);
+    try {
+      if (modalType === 'project') {
+        const url = editingItem ? `/api/projects/${(editingItem as any).id}` : '/api/projects';
+        const method = editingItem ? 'PUT' : 'POST';
+
+        await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+      } else if (modalType === 'page') {
+        await fetch('/api/pages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+      } else if (modalType === 'workflow') {
+        const method = editingItem ? 'PUT' : 'POST';
+        const body = editingItem ? { ...formData, id: (editingItem as any).id } : formData;
+
+        await fetch('/api/workflows', {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+      } else if (modalType === 'progress') {
+        const method = editingItem ? 'PUT' : 'POST';
+        const body = editingItem ? { ...formData, id: (editingItem as any).id } : formData;
+
+        await fetch('/api/daily-progress', {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+      } else if (modalType === 'pkr-opex') {
+        const method = editingItem ? 'PUT' : 'POST';
+        const body = editingItem ? { ...formData, id: (editingItem as any).id } : formData;
+
+        await fetch('/api/pkr-opex', {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+      }
+
+      await fetchAllData();
+      closeModal();
+    } catch (error) {
+      console.error('Error saving data:', error);
+      alert('Error saving data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (type: string, id: number) => {
+    // Langsung delete tanpa konfirmasi
+    setLoading(true);
+    try {
+      if (type === 'project') {
+        await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+      } else if (type === 'page') {
+        await fetch(`/api/pages?id=${id}`, { method: 'DELETE' });
+      } else if (type === 'workflow') {
+        await fetch(`/api/workflows?id=${id}`, { method: 'DELETE' });
+      } else if (type === 'progress') {
+        await fetch(`/api/daily-progress?id=${id}`, { method: 'DELETE' });
+      } else if (type === 'pkr-opex') {
+        await fetch(`/api/pkr-opex?id=${id}`, { method: 'DELETE' });
+      }
+
+      await fetchAllData();
+    } catch (error) {
+      console.error('Error deleting data:', error);
+      alert('Error deleting data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className={darkMode ? 'dark' : ''}>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        {/* Header */}
+        <Header
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+          sidebarCollapsed={sidebarCollapsed}
+          setSidebarCollapsed={setSidebarCollapsed}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+
+        {/* Sidebar Navigation */}
+        <TabNavigation
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          collapsed={sidebarCollapsed}
+        />
+
+        {/* Main Content */}
+        <div
+          className={`transition-all duration-300 pt-[104px] ${sidebarCollapsed ? 'ml-16' : 'ml-64'
+            }`}
+        >
+          <div className="px-4 sm:px-6 lg:px-8 py-8">
+            {loading && activeTab !== 'master' ? (
+              <div className="flex justify-center items-center h-64">
+                <Loader2 className="animate-spin text-blue-600 dark:text-blue-400" size={48} />
+              </div>
+            ) : (
+              <>
+                {activeTab === 'pivot' && (
+                  <PivotTab projects={projects} masterData={masterData} />
+                )}
+
+                {activeTab === 'report' && (
+                  <ReportTab projects={projects} masterData={masterData} />
+                )}
+
+                {activeTab === 'partnership' && (
+                  <PartnershipTab
+                    projects={projects}
+                    masterData={masterData}
+                    loading={loading}
+                    onOpenModal={openModal}
+                    onDelete={handleDelete}
+                  />
+                )}
+
+                {activeTab === 'page' && (
+                  <PageTab
+                    pages={pages}
+                    projects={projects}
+                    loading={loading}
+                    onOpenModal={openModal}
+                    onDelete={handleDelete}
+                    masterData={masterData}
+                  />
+                )}
+
+                {activeTab === 'master' && (
+                  <MasterTab masterData={masterData} onRefresh={fetchAllData} />
+                )}
+
+                {activeTab === 'pkr-opex' && (
+                  <PKROpexTab
+                    pkrOpex={pkrOpex}
+                    loading={loading}
+                    onOpenModal={openModal}
+                    onDelete={handleDelete}
+                  />
+                )}
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+
+        {/* Modal */}
+        <Modal
+          show={showModal}
+          type={modalType}
+          editingItem={editingItem}
+          masterData={masterData}
+          projects={[]}
+          pages={pages}
+          onClose={closeModal}
+          onSubmit={handleSubmit}
+        />
+      </div>
     </div>
   );
 }

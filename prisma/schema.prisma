@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Master Tables
+model MasterPIC {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  email     String?
+  projects  Project[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model MasterBranch {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  projects  Project[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model MasterPrioritas {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  projects  Project[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model MasterStatus {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  projects  Project[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model MasterKode {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model MasterBnP {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model MasterSO {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model MasterActivityType {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// Main Project Table (Partnership)
+model Project {
+  id                      Int            @id @default(autoincrement())
+  code                    String         @unique
+  kode                    String?
+  branchId                Int
+  branch                  MasterBranch   @relation(fields: [branchId], references: [id])
+  namaCalonMitra          String
+  prioritasId             Int
+  prioritas               MasterPrioritas @relation(fields: [prioritasId], references: [id])
+  picId                   Int
+  pic                     MasterPIC      @relation(fields: [picId], references: [id])
+  jenisKerjaSama          String
+  progressPercentage      Int            @default(0)
+  latestDateUpdated       DateTime?
+  latestUpdate            String?
+  actionPlan              String?
+  targetDate              DateTime?
+  linkDokumen             String?
+  latestActivity          String?
+  latestActivityStatusId  Int?
+  latestActivityStatus    MasterStatus?  @relation(fields: [latestActivityStatusId], references: [id])
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+}
+
+// Page Model (P.01, P.02, etc)
+model Page {
+  id              Int             @id @default(autoincrement())
+  pageNumber      String          @unique
+  partnershipName String
+  workflows       Workflow[]
+  dailyProgress   DailyProgress[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Workflow Table
+model Workflow {
+  id         Int      @id @default(autoincrement())
+  pageId     Int
+  page       Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  no         Int      @default(0)
+  activity   String
+  bobot      Int      @default(0)
+  target     String?
+  status     String?
+  progress   Int      @default(0)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// Daily Progress Table
+model DailyProgress {
+  id            Int      @id @default(autoincrement())
+  pageId        Int
+  page          Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  date          String
+  activityType  String
+  description   String
+  targetIfPlan  String?
+  pic           String
+  category      String?
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// PKR Opex Table
+model PKROpex {
+  id              Int      @id @default(autoincrement())
+  date            DateTime
+  mitra           String
+  description     String
+  saldoTopUp      Decimal? @db.Decimal(15, 2)
+  saldoPRK        Decimal? @db.Decimal(15, 2)
+  evidence        String?
+  pic             String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
