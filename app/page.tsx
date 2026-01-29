@@ -12,6 +12,8 @@ import PivotTab from './components/PivotTab';
 import ReportTab from './components/ReportTab';
 import Modal from './components/Modal';
 
+type FullScreenMode = 'none' | 'workflow' | 'progress' | 'both';
+
 export default function ProjectTracker() {
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -19,14 +21,14 @@ export default function ProjectTracker() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
-  const [editingItem, setEditingItem] = useState(null);
+  const [editingItem, setEditingItem] = useState<any>(null);
 
   // Data states
-  const [projects, setProjects] = useState([]);
-  const [pages, setPages] = useState([]);
-  const [workflows, setWorkflows] = useState([]);
-  const [dailyProgress, setDailyProgress] = useState([]);
-  const [pkrOpex, setPkrOpex] = useState([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [pages, setPages] = useState<any[]>([]);
+  const [workflows, setWorkflows] = useState<any[]>([]);
+  const [dailyProgress, setDailyProgress] = useState<any[]>([]);
+  const [pkrOpex, setPkrOpex] = useState<any[]>([]);
   const [masterData, setMasterData] = useState({
     pics: [],
     branches: [],
@@ -37,6 +39,26 @@ export default function ProjectTracker() {
     sos: [],
     activityTypes: []
   });
+
+  // Full-screen state - FIXED: Changed from boolean to FullScreenMode type
+  const [fullScreenMode, setFullScreenMode] = useState<FullScreenMode>('none');
+
+  // Load full-screen preference from localStorage
+  useEffect(() => {
+    const savedFullScreen = localStorage.getItem('pln_fullscreen');
+    if (savedFullScreen) {
+      // Parse saved value as FullScreenMode
+      const parsed = savedFullScreen as FullScreenMode;
+      if (['none', 'workflow', 'progress', 'both'].includes(parsed)) {
+        setFullScreenMode(parsed);
+      }
+    }
+  }, []);
+
+  // Save full-screen preference
+  useEffect(() => {
+    localStorage.setItem('pln_fullscreen', fullScreenMode);
+  }, [fullScreenMode]);
 
   // Dark mode detection
   useEffect(() => {
@@ -129,7 +151,7 @@ export default function ProjectTracker() {
     setLoading(true);
     try {
       if (modalType === 'project') {
-        const url = editingItem ? `/api/projects/${(editingItem as any).id}` : '/api/projects';
+        const url = editingItem ? `/api/projects/${editingItem.id}` : '/api/projects';
         const method = editingItem ? 'PUT' : 'POST';
 
         await fetch(url, {
@@ -138,14 +160,17 @@ export default function ProjectTracker() {
           body: JSON.stringify(formData)
         });
       } else if (modalType === 'page') {
-        await fetch('/api/pages', {
-          method: 'POST',
+        const url = editingItem ? `/api/pages?id=${editingItem.id}` : '/api/pages';
+        const method = editingItem ? 'PUT' : 'POST';
+
+        await fetch(url, {
+          method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
         });
       } else if (modalType === 'workflow') {
         const method = editingItem ? 'PUT' : 'POST';
-        const body = editingItem ? { ...formData, id: (editingItem as any).id } : formData;
+        const body = editingItem ? { ...formData, id: editingItem.id } : formData;
 
         await fetch('/api/workflows', {
           method,
@@ -154,7 +179,7 @@ export default function ProjectTracker() {
         });
       } else if (modalType === 'progress') {
         const method = editingItem ? 'PUT' : 'POST';
-        const body = editingItem ? { ...formData, id: (editingItem as any).id } : formData;
+        const body = editingItem ? { ...formData, id: editingItem.id } : formData;
 
         await fetch('/api/daily-progress', {
           method,
@@ -163,7 +188,7 @@ export default function ProjectTracker() {
         });
       } else if (modalType === 'pkr-opex') {
         const method = editingItem ? 'PUT' : 'POST';
-        const body = editingItem ? { ...formData, id: (editingItem as any).id } : formData;
+        const body = editingItem ? { ...formData, id: editingItem.id } : formData;
 
         await fetch('/api/pkr-opex', {
           method,
@@ -207,27 +232,39 @@ export default function ProjectTracker() {
     }
   };
 
+  // FIXED: Check if we should hide header/sidebar based on fullScreenMode
+  const shouldHideNavigation = fullScreenMode !== 'none';
+
   return (
     <div className={darkMode ? 'dark' : ''}>
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        {/* Header */}
-        <Header
-          darkMode={darkMode}
-          setDarkMode={setDarkMode}
-          sidebarCollapsed={sidebarCollapsed}
-          setSidebarCollapsed={setSidebarCollapsed}
-        />
+        {/* Header - Hidden in full-screen */}
+        {!shouldHideNavigation && (
+          <Header
+            darkMode={darkMode}
+            setDarkMode={setDarkMode}
+            sidebarCollapsed={sidebarCollapsed}
+            setSidebarCollapsed={setSidebarCollapsed}
+            setActiveTab={setActiveTab}
+          />
+        )}
 
-        {/* Sidebar Navigation */}
-        <TabNavigation
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          collapsed={sidebarCollapsed}
-        />
+        {/* Sidebar Navigation - Hidden in full-screen */}
+        {!shouldHideNavigation && (
+          <TabNavigation
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            collapsed={sidebarCollapsed}
+          />
+        )}
 
         {/* Main Content */}
         <div
-          className={`transition-all duration-300 pt-[104px] ${sidebarCollapsed ? 'ml-16' : 'ml-64'
+          className={`transition-all duration-300 ${shouldHideNavigation
+              ? 'ml-0 pt-0'
+              : sidebarCollapsed
+                ? 'ml-16 pt-24'
+                : 'ml-64 pt-24'
             }`}
         >
           <div className="px-4 sm:px-6 lg:px-8 py-8">
@@ -258,11 +295,16 @@ export default function ProjectTracker() {
                 {activeTab === 'page' && (
                   <PageTab
                     pages={pages}
-                    projects={projects}
-                    loading={loading}
+                    setPages={setPages}
+                    workflows={workflows}
+                    setWorkflows={setWorkflows}
+                    dailyProgress={dailyProgress}
+                    setDailyProgress={setDailyProgress}
+                    masterData={masterData}
+                    fullScreenMode={fullScreenMode}
+                    setFullScreenMode={setFullScreenMode}
                     onOpenModal={openModal}
                     onDelete={handleDelete}
-                    masterData={masterData}
                   />
                 )}
 
@@ -289,7 +331,7 @@ export default function ProjectTracker() {
           type={modalType}
           editingItem={editingItem}
           masterData={masterData}
-          projects={[]}
+          projects={projects}
           pages={pages}
           onClose={closeModal}
           onSubmit={handleSubmit}

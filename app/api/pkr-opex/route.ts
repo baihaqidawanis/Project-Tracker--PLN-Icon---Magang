@@ -67,11 +67,11 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    
+
     if (!id) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
-    
+
     await prisma.pKROpex.delete({
       where: { id: parseInt(id) },
     });
