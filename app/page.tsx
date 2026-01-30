@@ -261,10 +261,10 @@ export default function ProjectTracker() {
         {/* Main Content */}
         <div
           className={`transition-all duration-300 ${shouldHideNavigation
-              ? 'ml-0 pt-0'
-              : sidebarCollapsed
-                ? 'ml-16 pt-24'
-                : 'ml-64 pt-24'
+            ? 'ml-0 pt-0'
+            : sidebarCollapsed
+              ? 'ml-16 pt-24'
+              : 'ml-64 pt-24'
             }`}
         >
           <div className="px-4 sm:px-6 lg:px-8 py-8">
@@ -289,6 +289,9 @@ export default function ProjectTracker() {
                     loading={loading}
                     onOpenModal={openModal}
                     onDelete={handleDelete}
+                    pages={pages}
+                    workflows={workflows}
+                    dailyProgress={dailyProgress}
                   />
                 )}
 

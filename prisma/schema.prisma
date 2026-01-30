@@ -74,14 +74,14 @@ model Project {
   id                      Int            @id @default(autoincrement())
   code                    String         @unique
   kode                    String?
-  branchId                Int
-  branch                  MasterBranch   @relation(fields: [branchId], references: [id])
+  branchId                Int?
+  branch                  MasterBranch?  @relation(fields: [branchId], references: [id])
   namaCalonMitra          String
-  prioritasId             Int
-  prioritas               MasterPrioritas @relation(fields: [prioritasId], references: [id])
-  picId                   Int
-  pic                     MasterPIC      @relation(fields: [picId], references: [id])
-  jenisKerjaSama          String
+  prioritasId             Int?
+  prioritas               MasterPrioritas? @relation(fields: [prioritasId], references: [id])
+  picId                   Int?
+  pic                     MasterPIC?     @relation(fields: [picId], references: [id])
+  jenisKerjaSama          String?
   progressPercentage      Int            @default(0)
   latestDateUpdated       DateTime?
   latestUpdate            String?
@@ -124,18 +124,18 @@ model Workflow {
 
 // Daily Progress Table
 model DailyProgress {
-  id            Int      @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   pageId        Int
-  page          Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  date          String
+  page          Page      @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  date          DateTime?
   activityType  String
   description   String
-  targetIfPlan  String?
+  targetIfPlan  DateTime?
   pic           String
   category      String?
-  sortOrder     Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  sortOrder     Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 // PKR Opex Table

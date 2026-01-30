@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     const data = await request.json();
     console.log('[API POST] Received data:', data);
 
+    // Create the page
     const page = await prisma.page.create({
       data: {
         pageNumber: data.pageNumber,
@@ -45,6 +46,21 @@ export async function POST(request: Request) {
     });
 
     console.log('[API POST] Created page:', page);
+
+    // Auto-create Partnership (Project) row
+    try {
+      const project = await prisma.project.create({
+        data: {
+          code: data.pageNumber, // Auto-populate code from pageNumber
+          namaCalonMitra: data.partnershipName, // Auto-populate from partnershipName
+        },
+      });
+      console.log('[API POST] Auto-created Partnership row:', project);
+    } catch (projectError) {
+      console.error('[API POST] Failed to auto-create Partnership row:', projectError);
+      // Don't fail the entire request if Partnership creation fails
+    }
+
     return NextResponse.json(page);
   } catch (error) {
     console.error('[API POST] Error:', error);
@@ -67,6 +83,28 @@ export async function PUT(request: Request) {
     });
 
     console.log('[API PUT] Updated page:', page);
+
+    // Update corresponding Partnership (Project) row if it exists
+    try {
+      const existingProject = await prisma.project.findFirst({
+        where: { code: data.pageNumber },
+      });
+
+      if (existingProject) {
+        await prisma.project.update({
+          where: { id: existingProject.id },
+          data: {
+            code: data.pageNumber,
+            namaCalonMitra: data.partnershipName,
+          },
+        });
+        console.log('[API PUT] Updated corresponding Partnership row');
+      }
+    } catch (projectError) {
+      console.error('[API PUT] Failed to update Partnership row:', projectError);
+      // Don't fail the entire request if Partnership update fails
+    }
+
     return NextResponse.json(page);
   } catch (error) {
     console.error('[API PUT] Error:', error);

@@ -34,10 +34,10 @@ export async function POST(request: Request) {
     const progress = await prisma.dailyProgress.create({
       data: {
         pageId: parseInt(data.pageId),
-        date: data.date,
+        date: data.date ? new Date(data.date) : null,
         activityType: data.activityType,
         description: data.description,
-        targetIfPlan: data.targetIfPlan,
+        targetIfPlan: data.targetIfPlan ? new Date(data.targetIfPlan) : null,
         pic: data.pic,
         category: data.category,
         sortOrder: data.sortOrder !== undefined ? parseInt(data.sortOrder) : 0,
@@ -69,10 +69,10 @@ export async function PUT(request: Request) {
     const progress = await prisma.dailyProgress.update({
       where: { id: parseInt(data.id) },
       data: {
-        date: data.date,
+        date: data.date ? new Date(data.date) : null,
         activityType: data.activityType,
         description: data.description,
-        targetIfPlan: data.targetIfPlan,
+        targetIfPlan: data.targetIfPlan ? new Date(data.targetIfPlan) : null,
         pic: data.pic,
         category: data.category,
         sortOrder: data.sortOrder !== undefined ? parseInt(data.sortOrder) : 0,

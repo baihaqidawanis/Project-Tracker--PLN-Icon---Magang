@@ -19,6 +19,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { formatDateShort, formatDateForInput } from '../utils/date-utils';
 
 interface PKROpexRow {
   clientId: string;
@@ -95,6 +96,54 @@ function ResizeHandle({ column, onResizeStart }: ResizeHandleProps) {
           <path d="M2 0h1v20H2V0zm5 0h1v20H7V0z" />
         </svg>
       </div>
+    </div>
+  );
+}
+
+// DateDisplayInput Component - shows "dd MMM" when not focused, date picker when focused
+interface DateDisplayInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  onFocus?: () => void;
+  onPaste?: (e: ClipboardEvent) => void;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+function DateDisplayInput({ value, onChange, onFocus, onPaste, className, style }: DateDisplayInputProps) {
+  const [isFocused, setIsFocused] = useState(false);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    if (onFocus) onFocus();
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+  };
+
+  if (isFocused) {
+    return (
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={handleBlur}
+        onPaste={onPaste}
+        className={className}
+        style={style}
+        autoFocus
+      />
+    );
+  }
+
+  return (
+    <div
+      onClick={handleFocus}
+      className={className}
+      style={{ ...style, cursor: 'pointer' }}
+    >
+      {value ? formatDateShort(value) : '-'}
     </div>
   );
 }
@@ -528,7 +577,33 @@ export default function PKROpexTab({
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Daily Progress</p>
           </div>
           <div className="flex gap-3 items-center">
-            {/* ... (Zoom Control & Save Status omitted) */}
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-2 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600">
+              <button
+                onClick={() => setZoom(Math.max(30, zoom - 10))}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded"
+                title="Zoom Out"
+              >
+                <ZoomOut size={16} />
+              </button>
+              <input
+                type="number"
+                value={zoom}
+                onChange={(e) => setZoom(Math.min(200, Math.max(30, Number(e.target.value) || 100)))}
+                className="w-14 px-2 py-1 text-center border-0 bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 rounded"
+                min="30"
+                max="200"
+              />
+              <span className="text-sm text-gray-600 dark:text-gray-400">%</span>
+              <button
+                onClick={() => setZoom(Math.min(200, zoom + 10))}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded"
+                title="Zoom In"
+              >
+                <ZoomIn size={16} />
+              </button>
+            </div>
+
             <div className="flex items-center gap-2">
               {saveStatus === 'saving' && (
                 <span className="text-xs text-blue-600 font-medium flex items-center gap-1 animate-pulse">
@@ -558,207 +633,210 @@ export default function PKROpexTab({
 
       {/* Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
-        <div
-          id="pkr-table-container"
-          className="overflow-x-auto max-h-[600px]"
-          style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top left', width: `${100 / (zoom / 100)}%` }}
-        >
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
+        <div className="overflow-auto" style={{ maxHeight: '600px' }}>
+          <div
+            id="pkr-table-container"
+            style={{
+              zoom: zoom / 100,
+              minWidth: 'max-content'
+            }}
           >
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-blue-50 dark:bg-gray-900 sticky top-0 z-10">
-                <tr>
-                  <th className="px-1 py-2 w-8"></th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.date }}>
-                    Date
-                    <ResizeHandle column="date" onResizeStart={handleColumnResizeStart} />
-                  </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.mitra }}>
-                    Mitra
-                    <ResizeHandle column="mitra" onResizeStart={handleColumnResizeStart} />
-                  </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.description }}>
-                    Description
-                    <ResizeHandle column="description" onResizeStart={handleColumnResizeStart} />
-                  </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.saldoTopUp }}>
-                    Saldo Top Up
-                    <ResizeHandle column="saldoTopUp" onResizeStart={handleColumnResizeStart} />
-                  </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.saldoPRK }}>
-                    Saldo PRK
-                    <ResizeHandle column="saldoPRK" onResizeStart={handleColumnResizeStart} />
-                  </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.evidence }}>
-                    Evidence
-                    <ResizeHandle column="evidence" onResizeStart={handleColumnResizeStart} />
-                  </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.pic }}>
-                    PIC
-                    <ResizeHandle column="pic" onResizeStart={handleColumnResizeStart} />
-                  </th>
-                  <th className="px-1 py-1 text-center w-8"></th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700" style={{ fontSize: 10 }}>
-                <SortableContext
-                  items={rows.map(r => r.clientId)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  {rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                        No PKR Opex entries found. Click "Add Row" to create one.
-                      </td>
-                    </tr>
-                  ) : (
-                    rows.map((row, idx) => (
-                      <SortableRow
-                        key={row.clientId}
-                        id={row.clientId}
-                        className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${row.isDirty ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}`}
-                      >
-                        <td className="px-2 py-1" style={{ width: columnWidths.date }}>
-                          <div className={`relative w-full ${isCellInSelection(idx, 'date') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                            onMouseEnter={() => handleFillMouseEnter(idx, 'date')}>
-                            <input
-                              type="date"
-                              value={row.date}
-                              onFocus={() => handleCellFocus(idx, 'date')}
-                              onChange={(e) => updateCell(idx, 'date', e.target.value)}
-                              onPaste={(e) => handlePaste(e, idx, 0)}
-                              className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100"
-                              style={{ fontSize: 10 }}
-                            />
-                            {isCellActive(idx, 'date') && !isDraggingFill && (
-                              <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
-                            )}
-                          </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <table className="w-full divide-y divide-gray-200 dark:divide-gray-700" style={{ minWidth: 'max-content' }}>
+                <thead className="bg-blue-50 dark:bg-gray-900 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-1 py-2 w-8"></th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.date }}>
+                      Date
+                      <ResizeHandle column="date" onResizeStart={handleColumnResizeStart} />
+                    </th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.mitra }}>
+                      Mitra
+                      <ResizeHandle column="mitra" onResizeStart={handleColumnResizeStart} />
+                    </th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.description }}>
+                      Description
+                      <ResizeHandle column="description" onResizeStart={handleColumnResizeStart} />
+                    </th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.saldoTopUp }}>
+                      Saldo Top Up
+                      <ResizeHandle column="saldoTopUp" onResizeStart={handleColumnResizeStart} />
+                    </th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.saldoPRK }}>
+                      Saldo PRK
+                      <ResizeHandle column="saldoPRK" onResizeStart={handleColumnResizeStart} />
+                    </th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.evidence }}>
+                      Evidence
+                      <ResizeHandle column="evidence" onResizeStart={handleColumnResizeStart} />
+                    </th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.pic }}>
+                      PIC
+                      <ResizeHandle column="pic" onResizeStart={handleColumnResizeStart} />
+                    </th>
+                    <th className="px-1 py-1 text-center w-8"></th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700" style={{ fontSize: 10 }}>
+                  <SortableContext
+                    items={rows.map(r => r.clientId)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                          No PKR Opex entries found. Click "Add Row" to create one.
                         </td>
-                        <td className="px-2 py-1" style={{ width: columnWidths.mitra }}>
-                          <div className={`relative w-full ${isCellInSelection(idx, 'mitra') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                            onMouseEnter={() => handleFillMouseEnter(idx, 'mitra')}>
-                            <textarea
-                              value={row.mitra}
-                              onFocus={() => handleCellFocus(idx, 'mitra')}
-                              onChange={(e) => updateCell(idx, 'mitra', e.target.value)}
-                              onPaste={(e) => handlePaste(e, idx, 1)}
-                              className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 resize-none overflow-hidden"
-                              style={{ fontSize: 10 }}
-                              rows={1}
-                              onInput={autoResize}
-                              placeholder="Mitra name..."
-                            />
-                            {isCellActive(idx, 'mitra') && !isDraggingFill && (
-                              <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-1" style={{ width: columnWidths.description }}>
-                          <div className={`relative w-full ${isCellInSelection(idx, 'description') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                            onMouseEnter={() => handleFillMouseEnter(idx, 'description')}>
-                            <textarea
-                              value={row.description}
-                              onFocus={() => handleCellFocus(idx, 'description')}
-                              onChange={(e) => updateCell(idx, 'description', e.target.value)}
-                              onPaste={(e) => handlePaste(e, idx, 2)}
-                              className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 resize-none overflow-hidden"
-                              style={{ fontSize: 10 }}
-                              rows={1}
-                              onInput={autoResize}
-                              placeholder="Description..."
-                            />
-                            {isCellActive(idx, 'description') && !isDraggingFill && (
-                              <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-1" style={{ width: columnWidths.saldoTopUp }}>
-                          <div className={`relative w-full ${isCellInSelection(idx, 'saldoTopUp') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                            onMouseEnter={() => handleFillMouseEnter(idx, 'saldoTopUp')}>
-                            <CurrencyInput
-                              value={row.saldoTopUp}
-                              onFocus={() => handleCellFocus(idx, 'saldoTopUp')}
-                              onChange={(value) => updateCell(idx, 'saldoTopUp', value)}
-                              onPaste={(e) => handlePaste(e, idx, 3)}
-                              formatCurrency={formatCurrency}
-                            />
-                            {isCellActive(idx, 'saldoTopUp') && !isDraggingFill && (
-                              <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-1" style={{ width: columnWidths.saldoPRK }}>
-                          <div className={`relative w-full ${isCellInSelection(idx, 'saldoPRK') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                            onMouseEnter={() => handleFillMouseEnter(idx, 'saldoPRK')}>
-                            <CurrencyInput
-                              value={row.saldoPRK}
-                              onFocus={() => handleCellFocus(idx, 'saldoPRK')}
-                              onChange={(value) => updateCell(idx, 'saldoPRK', value)}
-                              onPaste={(e) => handlePaste(e, idx, 4)}
-                              formatCurrency={formatCurrency}
-                            />
-                            {isCellActive(idx, 'saldoPRK') && !isDraggingFill && (
-                              <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-1" style={{ width: columnWidths.evidence }}>
-                          <div className={`relative w-full ${isCellInSelection(idx, 'evidence') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                            onMouseEnter={() => handleFillMouseEnter(idx, 'evidence')}>
-                            <input
-                              type="url"
-                              value={row.evidence}
-                              onFocus={() => handleCellFocus(idx, 'evidence')}
-                              onChange={(e) => updateCell(idx, 'evidence', e.target.value)}
-                              onPaste={(e) => handlePaste(e, idx, 5)}
-                              className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100"
-                              style={{ fontSize: 10 }}
-                              placeholder="https://..."
-                            />
-                            {isCellActive(idx, 'evidence') && !isDraggingFill && (
-                              <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-1" style={{ width: columnWidths.pic }}>
-                          <div className={`relative w-full ${isCellInSelection(idx, 'pic') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                            onMouseEnter={() => handleFillMouseEnter(idx, 'pic')}>
-                            <textarea
-                              value={row.pic}
-                              onFocus={() => handleCellFocus(idx, 'pic')}
-                              onChange={(e) => updateCell(idx, 'pic', e.target.value)}
-                              onPaste={(e) => handlePaste(e, idx, 6)}
-                              className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 resize-none overflow-hidden"
-                              style={{ fontSize: 10 }}
-                              rows={1}
-                              onInput={autoResize}
-                              placeholder="PIC..."
-                            />
-                            {isCellActive(idx, 'pic') && !isDraggingFill && (
-                              <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-1 py-1 text-center">
-                          <button
-                            onClick={() => deleteRow(idx)}
-                            className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                            title="Delete row"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
-                      </SortableRow>
-                    ))
-                  )}
-                </SortableContext>
-              </tbody>
-            </table>
-          </DndContext>
+                      </tr>
+                    ) : (
+                      rows.map((row, idx) => (
+                        <SortableRow
+                          key={row.clientId}
+                          id={row.clientId}
+                          className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${row.isDirty ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}`}
+                        >
+                          <td className="px-2 py-1" style={{ width: columnWidths.date }}>
+                            <div className={`relative w-full ${isCellInSelection(idx, 'date') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                              onMouseEnter={() => handleFillMouseEnter(idx, 'date')}>
+                              <DateDisplayInput
+                                value={row.date}
+                                onChange={(value) => updateCell(idx, 'date', value)}
+                                onFocus={() => handleCellFocus(idx, 'date')}
+                                onPaste={(e) => handlePaste(e, idx, 0)}
+                                className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100"
+                                style={{ fontSize: 10 }}
+                              />
+                              {isCellActive(idx, 'date') && !isDraggingFill && (
+                                <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-1" style={{ width: columnWidths.mitra }}>
+                            <div className={`relative w-full ${isCellInSelection(idx, 'mitra') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                              onMouseEnter={() => handleFillMouseEnter(idx, 'mitra')}>
+                              <textarea
+                                value={row.mitra}
+                                onFocus={() => handleCellFocus(idx, 'mitra')}
+                                onChange={(e) => updateCell(idx, 'mitra', e.target.value)}
+                                onPaste={(e) => handlePaste(e, idx, 1)}
+                                className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 resize-none overflow-hidden"
+                                style={{ fontSize: 10 }}
+                                rows={1}
+                                onInput={autoResize}
+                                placeholder="Mitra name..."
+                              />
+                              {isCellActive(idx, 'mitra') && !isDraggingFill && (
+                                <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-1" style={{ width: columnWidths.description }}>
+                            <div className={`relative w-full ${isCellInSelection(idx, 'description') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                              onMouseEnter={() => handleFillMouseEnter(idx, 'description')}>
+                              <textarea
+                                value={row.description}
+                                onFocus={() => handleCellFocus(idx, 'description')}
+                                onChange={(e) => updateCell(idx, 'description', e.target.value)}
+                                onPaste={(e) => handlePaste(e, idx, 2)}
+                                className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 resize-none overflow-hidden"
+                                style={{ fontSize: 10 }}
+                                rows={1}
+                                onInput={autoResize}
+                                placeholder="Description..."
+                              />
+                              {isCellActive(idx, 'description') && !isDraggingFill && (
+                                <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-1" style={{ width: columnWidths.saldoTopUp }}>
+                            <div className={`relative w-full ${isCellInSelection(idx, 'saldoTopUp') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                              onMouseEnter={() => handleFillMouseEnter(idx, 'saldoTopUp')}>
+                              <CurrencyInput
+                                value={row.saldoTopUp}
+                                onFocus={() => handleCellFocus(idx, 'saldoTopUp')}
+                                onChange={(value) => updateCell(idx, 'saldoTopUp', value)}
+                                onPaste={(e) => handlePaste(e, idx, 3)}
+                                formatCurrency={formatCurrency}
+                              />
+                              {isCellActive(idx, 'saldoTopUp') && !isDraggingFill && (
+                                <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-1" style={{ width: columnWidths.saldoPRK }}>
+                            <div className={`relative w-full ${isCellInSelection(idx, 'saldoPRK') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                              onMouseEnter={() => handleFillMouseEnter(idx, 'saldoPRK')}>
+                              <CurrencyInput
+                                value={row.saldoPRK}
+                                onFocus={() => handleCellFocus(idx, 'saldoPRK')}
+                                onChange={(value) => updateCell(idx, 'saldoPRK', value)}
+                                onPaste={(e) => handlePaste(e, idx, 4)}
+                                formatCurrency={formatCurrency}
+                              />
+                              {isCellActive(idx, 'saldoPRK') && !isDraggingFill && (
+                                <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-1" style={{ width: columnWidths.evidence }}>
+                            <div className={`relative w-full ${isCellInSelection(idx, 'evidence') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                              onMouseEnter={() => handleFillMouseEnter(idx, 'evidence')}>
+                              <input
+                                type="url"
+                                value={row.evidence}
+                                onFocus={() => handleCellFocus(idx, 'evidence')}
+                                onChange={(e) => updateCell(idx, 'evidence', e.target.value)}
+                                onPaste={(e) => handlePaste(e, idx, 5)}
+                                className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100"
+                                style={{ fontSize: 10 }}
+                                placeholder="https://..."
+                              />
+                              {isCellActive(idx, 'evidence') && !isDraggingFill && (
+                                <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-1" style={{ width: columnWidths.pic }}>
+                            <div className={`relative w-full ${isCellInSelection(idx, 'pic') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                              onMouseEnter={() => handleFillMouseEnter(idx, 'pic')}>
+                              <textarea
+                                value={row.pic}
+                                onFocus={() => handleCellFocus(idx, 'pic')}
+                                onChange={(e) => updateCell(idx, 'pic', e.target.value)}
+                                onPaste={(e) => handlePaste(e, idx, 6)}
+                                className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 resize-none overflow-hidden"
+                                style={{ fontSize: 10 }}
+                                rows={1}
+                                onInput={autoResize}
+                                placeholder="PIC..."
+                              />
+                              {isCellActive(idx, 'pic') && !isDraggingFill && (
+                                <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-1 py-1 text-center">
+                            <button
+                              onClick={() => deleteRow(idx)}
+                              className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                              title="Delete row"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </SortableRow>
+                      ))
+                    )}
+                  </SortableContext>
+                </tbody>
+              </table>
+            </DndContext>
+          </div>
         </div>
       </div>
     </div>

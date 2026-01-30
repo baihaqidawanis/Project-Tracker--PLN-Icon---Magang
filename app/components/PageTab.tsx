@@ -20,6 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Select from 'react-select';
+import { formatDateShort, formatDateForInput } from '../utils/date-utils';
 
 interface WorkflowRow {
   clientId: string; // For frontend DnD stability
@@ -124,6 +125,54 @@ type PageTabProps = {
   onOpenModal: (type: string, data?: any) => void;
   onDelete: (type: string, id: number) => Promise<void>;
 };
+
+// DateDisplayInput Component - shows "dd MMM" when not focused, date picker when focused
+interface DateDisplayInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  onFocus?: () => void;
+  onPaste?: (e: ClipboardEvent) => void;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+function DateDisplayInput({ value, onChange, onFocus, onPaste, className, style }: DateDisplayInputProps) {
+  const [isFocused, setIsFocused] = useState(false);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    if (onFocus) onFocus();
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+  };
+
+  if (isFocused) {
+    return (
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={handleBlur}
+        onPaste={onPaste}
+        className={className}
+        style={style}
+        autoFocus
+      />
+    );
+  }
+
+  return (
+    <div
+      onClick={handleFocus}
+      className={className}
+      style={{ ...style, cursor: 'pointer' }}
+    >
+      {value ? formatDateShort(value) : '-'}
+    </div>
+  );
+}
 
 export default function PageTab({
   pages,
@@ -979,21 +1028,30 @@ export default function PageTab({
 
                     <div className="flex items-center gap-3 flex-wrap">
                       {/* Zoom Control */}
-                      <div className="flex items-center gap-2 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600">
-                        <ZoomOut size={14} className="text-gray-600 dark:text-gray-300" />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setWorkflowZoom(Math.max(30, workflowZoom - 10))}
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                          title="Zoom Out"
+                        >
+                          <ZoomOut size={18} />
+                        </button>
                         <input
-                          type="range"
+                          type="number"
+                          value={workflowZoom}
+                          onChange={(e) => setWorkflowZoom(Math.min(200, Math.max(30, Number(e.target.value) || 100)))}
+                          className="w-16 px-2 py-1 text-center border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
                           min="30"
                           max="200"
-                          value={workflowZoom}
-                          onChange={(e) => setWorkflowZoom(Number(e.target.value))}
-                          className="w-24 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600"
-                          style={{
-                            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(workflowZoom - 30) / 1.7}%, #e5e7eb ${(workflowZoom - 30) / 1.7}%, #e5e7eb 100%)`
-                          }}
                         />
-                        <ZoomIn size={14} className="text-gray-600 dark:text-gray-300" />
-                        <span className="text-xs font-medium text-gray-700 dark:text-gray-200 min-w-[38px] text-center">{workflowZoom}%</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">%</span>
+                        <button
+                          onClick={() => setWorkflowZoom(Math.min(200, workflowZoom + 10))}
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                          title="Zoom In"
+                        >
+                          <ZoomIn size={18} />
+                        </button>
                       </div>
 
 
@@ -1036,195 +1094,199 @@ export default function PageTab({
                     </div>
                   </div>
 
-                  <div
-                    id="workflow-table-container"
-                    className="overflow-x-auto max-h-96"
-                    style={{ transform: `scale(${workflowZoom / 100})`, transformOrigin: 'top left', width: `${100 / (workflowZoom / 100)}%` }}
-                  >
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEnd}
+                  <div className="overflow-auto" style={{ maxHeight: '600px' }}>
+                    <div
+                      id="workflow-table-container"
+                      style={{
+                        zoom: workflowZoom / 100,
+                        minWidth: 'max-content'
+                      }}
                     >
-                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
-                          <tr>
-                            <th className={compactMode ? "px-1 py-1 w-8" : "px-1 py-2 w-8"}></th>
-                            <th className={compactMode ? "px-2 py-1 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" : "px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative"} style={{ width: workflowColumnWidths.no }}>
-                              No
-                              <ResizeHandle table="workflow" column="no" onResizeStart={handleColumnResizeStart} />
-                            </th>
-                            <th className={compactMode ? "px-2 py-1 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" : "px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative"} style={{ width: workflowColumnWidths.activity }}>
-                              Activity
-                              <ResizeHandle table="workflow" column="activity" onResizeStart={handleColumnResizeStart} />
-                            </th>
-                            <th className={compactMode ? "px-2 py-1 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" : "px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative"} style={{ width: workflowColumnWidths.bobot }}>
-                              Bobot%
-                              <ResizeHandle table="workflow" column="bobot" onResizeStart={handleColumnResizeStart} />
-                            </th>
-                            <th className={compactMode ? "px-2 py-1 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" : "px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative"} style={{ width: workflowColumnWidths.target }}>
-                              Target
-                              <ResizeHandle table="workflow" column="target" onResizeStart={handleColumnResizeStart} />
-                            </th>
-                            <th className={compactMode ? "px-2 py-1 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" : "px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative"} style={{ width: workflowColumnWidths.status }}>
-                              Status
-                              <ResizeHandle table="workflow" column="status" onResizeStart={handleColumnResizeStart} />
-                            </th>
-                            <th className={compactMode ? "px-2 py-1 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" : "px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative"} style={{ width: workflowColumnWidths.progress }}>
-                              Progress%
-                              <ResizeHandle table="workflow" column="progress" onResizeStart={handleColumnResizeStart} />
-                            </th>
-                            <th className={compactMode ? "px-1 py-1 text-center w-8" : "px-1 py-1 text-center w-8"}></th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700" style={{ fontSize: compactMode ? 9 : 10 }}>
-                          <SortableContext
-                            items={workflowRows.map(r => r.clientId)}
-                            strategy={verticalListSortingStrategy}
-                          >
-                            {workflowRows.length === 0 ? (
-                              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">No workflows yet.</td></tr>
-                            ) : (
-                              workflowRows.map((row, rowIdx) => (
-                                <SortableRow
-                                  key={row.clientId}
-                                  id={row.clientId}
-                                  className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${row.isDirty ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}`}
-                                >
-                                  <td className="px-2 py-1" style={{ width: workflowColumnWidths.no, wordWrap: 'break-word' }}>
-                                    {row.type === 'main' ? (
-                                      <div className={`relative w-full ${isCellInSelection(rowIdx, 'no', 'workflow') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                                        onMouseEnter={() => handleFillMouseEnter(rowIdx, 'no', 'workflow')}>
-                                        <input type="text" value={row.no}
-                                          onFocus={() => handleCellFocus(rowIdx, 'no', 'workflow')}
-                                          onChange={(e) => updateWorkflowCell(rowIdx, 'no', e.target.value)}
-                                          className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded font-bold"
-                                          style={{ fontSize: 10 }}
-                                        />
-                                        {isCellActive(rowIdx, 'no', 'workflow') && !isDraggingFill && (
-                                          <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
-                                        )}
-                                      </div>
-                                    ) : null}
-                                  </td>
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
+                            <tr>
+                              <th className={compactMode ? "px-1 py-1 w-8" : "px-1 py-2 w-8"}></th>
+                              <th className={compactMode ? "px-2 py-1 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" : "px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative"} style={{ width: workflowColumnWidths.no }}>
+                                No
+                                <ResizeHandle table="workflow" column="no" onResizeStart={handleColumnResizeStart} />
+                              </th>
+                              <th className={compactMode ? "px-2 py-1 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" : "px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative"} style={{ width: workflowColumnWidths.activity }}>
+                                Activity
+                                <ResizeHandle table="workflow" column="activity" onResizeStart={handleColumnResizeStart} />
+                              </th>
+                              <th className={compactMode ? "px-2 py-1 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" : "px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative"} style={{ width: workflowColumnWidths.bobot }}>
+                                Bobot%
+                                <ResizeHandle table="workflow" column="bobot" onResizeStart={handleColumnResizeStart} />
+                              </th>
+                              <th className={compactMode ? "px-2 py-1 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" : "px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative"} style={{ width: workflowColumnWidths.target }}>
+                                Target
+                                <ResizeHandle table="workflow" column="target" onResizeStart={handleColumnResizeStart} />
+                              </th>
+                              <th className={compactMode ? "px-2 py-1 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" : "px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative"} style={{ width: workflowColumnWidths.status }}>
+                                Status
+                                <ResizeHandle table="workflow" column="status" onResizeStart={handleColumnResizeStart} />
+                              </th>
+                              <th className={compactMode ? "px-2 py-1 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" : "px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative"} style={{ width: workflowColumnWidths.progress }}>
+                                Progress%
+                                <ResizeHandle table="workflow" column="progress" onResizeStart={handleColumnResizeStart} />
+                              </th>
+                              <th className={compactMode ? "px-1 py-1 text-center w-8" : "px-1 py-1 text-center w-8"}></th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700" style={{ fontSize: compactMode ? 9 : 10 }}>
+                            <SortableContext
+                              items={workflowRows.map(r => r.clientId)}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              {workflowRows.length === 0 ? (
+                                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">No workflows yet.</td></tr>
+                              ) : (
+                                workflowRows.map((row, rowIdx) => (
+                                  <SortableRow
+                                    key={row.clientId}
+                                    id={row.clientId}
+                                    className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${row.isDirty ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}`}
+                                  >
+                                    <td className="px-2 py-1" style={{ width: workflowColumnWidths.no, wordWrap: 'break-word' }}>
+                                      {row.type === 'main' ? (
+                                        <div className={`relative w-full ${isCellInSelection(rowIdx, 'no', 'workflow') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                                          onMouseEnter={() => handleFillMouseEnter(rowIdx, 'no', 'workflow')}>
+                                          <input type="text" value={row.no}
+                                            onFocus={() => handleCellFocus(rowIdx, 'no', 'workflow')}
+                                            onChange={(e) => updateWorkflowCell(rowIdx, 'no', e.target.value)}
+                                            className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded font-bold"
+                                            style={{ fontSize: 10 }}
+                                          />
+                                          {isCellActive(rowIdx, 'no', 'workflow') && !isDraggingFill && (
+                                            <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
+                                          )}
+                                        </div>
+                                      ) : null}
+                                    </td>
 
-                                  <td className="px-2 py-1 relative" style={{ width: workflowColumnWidths.activity, wordWrap: 'break-word' }}>
-                                    <div className={`relative w-full ${isCellInSelection(rowIdx, 'activity', 'workflow') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                                      onMouseEnter={() => handleFillMouseEnter(rowIdx, 'activity', 'workflow')}>
-                                      <textarea
-                                        value={row.activity}
-                                        onFocus={() => handleCellFocus(rowIdx, 'activity', 'workflow')}
-                                        onChange={(e) => updateWorkflowCell(rowIdx, 'activity', e.target.value)}
-                                        onPaste={(e) => {
-                                          e.preventDefault();
-                                          const pastedData = e.clipboardData.getData('text');
-                                          const normalized = pastedData.replace(/\r\n|\r/g, '\n');
-                                          updateWorkflowCell(rowIdx, 'activity', normalized);
-                                        }}
-                                        className={`w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded resize-none overflow-hidden ${row.type === 'main' ? 'font-bold' : ''}`}
-                                        style={{ fontSize: 10 }}
-                                        rows={1} onInput={autoResize}
-                                        placeholder={row.type === 'main' ? "Main Activity" : "Sub Activity"}
-                                      />
-                                      {isCellActive(rowIdx, 'activity', 'workflow') && !isDraggingFill && (
-                                        <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
-                                      )}
-                                    </div>
-                                  </td>
-
-                                  <td className="px-2 py-1" style={{ width: workflowColumnWidths.bobot, wordWrap: 'break-word' }}>
-                                    {row.type === 'sub' && (
-                                      <div className={`relative w-full ${isCellInSelection(rowIdx, 'bobot', 'workflow') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                                        onMouseEnter={() => handleFillMouseEnter(rowIdx, 'bobot', 'workflow')}>
-                                        <input type="number" value={row.bobot}
-                                          onFocus={() => handleCellFocus(rowIdx, 'bobot', 'workflow')}
-                                          onChange={(e) => updateWorkflowCell(rowIdx, 'bobot', parseInt(e.target.value) || 0)}
-                                          onPaste={(e) => handleWorkflowPaste(e, rowIdx, 2)}
-                                          className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded"
-                                          style={{ fontSize: 10 }}
-                                        />
-                                        {isCellActive(rowIdx, 'bobot', 'workflow') && !isDraggingFill && (
-                                          <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
-                                        )}
-                                      </div>
-                                    )}
-                                  </td>
-
-                                  <td className="px-2 py-1" style={{ width: workflowColumnWidths.target, wordWrap: 'break-word' }}>
-                                    {row.type === 'sub' && (
-                                      <div className={`relative w-full ${isCellInSelection(rowIdx, 'target', 'workflow') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                                        onMouseEnter={() => handleFillMouseEnter(rowIdx, 'target', 'workflow')}>
-                                        <textarea value={row.target}
-                                          onFocus={() => handleCellFocus(rowIdx, 'target', 'workflow')}
-                                          onChange={(e) => updateWorkflowCell(rowIdx, 'target', e.target.value)}
-                                          onPaste={(e) => handleWorkflowPaste(e, rowIdx, 3)}
-                                          className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded resize-none overflow-hidden"
+                                    <td className="px-2 py-1 relative" style={{ width: workflowColumnWidths.activity, wordWrap: 'break-word' }}>
+                                      <div className={`relative w-full ${isCellInSelection(rowIdx, 'activity', 'workflow') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                                        onMouseEnter={() => handleFillMouseEnter(rowIdx, 'activity', 'workflow')}>
+                                        <textarea
+                                          value={row.activity}
+                                          onFocus={() => handleCellFocus(rowIdx, 'activity', 'workflow')}
+                                          onChange={(e) => updateWorkflowCell(rowIdx, 'activity', e.target.value)}
+                                          onPaste={(e) => {
+                                            e.preventDefault();
+                                            const pastedData = e.clipboardData.getData('text');
+                                            const normalized = pastedData.replace(/\r\n|\r/g, '\n');
+                                            updateWorkflowCell(rowIdx, 'activity', normalized);
+                                          }}
+                                          className={`w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded resize-none overflow-hidden ${row.type === 'main' ? 'font-bold' : ''}`}
                                           style={{ fontSize: 10 }}
                                           rows={1} onInput={autoResize}
+                                          placeholder={row.type === 'main' ? "Main Activity" : "Sub Activity"}
                                         />
-                                        {isCellActive(rowIdx, 'target', 'workflow') && !isDraggingFill && (
+                                        {isCellActive(rowIdx, 'activity', 'workflow') && !isDraggingFill && (
                                           <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
                                         )}
                                       </div>
-                                    )}
-                                  </td>
+                                    </td>
 
-                                  <td className="px-2 py-2" style={{ width: workflowColumnWidths.status, wordWrap: 'break-word' }}>
-                                    {row.type === 'sub' && (
-                                      <div className={`relative w-full ${isCellInSelection(rowIdx, 'status', 'workflow') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                                        onMouseEnter={() => handleFillMouseEnter(rowIdx, 'status', 'workflow')}>
-                                        <select value={row.status}
-                                          onFocus={() => handleCellFocus(rowIdx, 'status', 'workflow')}
-                                          onChange={(e) => updateWorkflowCell(rowIdx, 'status', e.target.value)}
-                                          className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded whitespace-normal [&>option]:text-gray-900 [&>option]:bg-white dark:[&>option]:text-gray-100 dark:[&>option]:bg-gray-800 [&>option]:whitespace-normal [&>option]:py-2"
-                                          style={{ fontSize: 10, whiteSpace: 'normal', wordWrap: 'break-word', overflowWrap: 'break-word', minHeight: 28, height: 'auto' }}
-                                        >
-                                          <option value="">-</option>
-                                          <option value="Not Started" style={{ whiteSpace: 'pre-line', wordBreak: 'break-word', fontSize: 12 }}>Not Started</option>
-                                          <option value="On Progress" style={{ whiteSpace: 'pre-line', wordBreak: 'break-word', fontSize: 12 }}>On Progress</option>
-                                          <option value="Done" style={{ whiteSpace: 'pre-line', wordBreak: 'break-word', fontSize: 12 }}>Done</option>
-                                        </select>
-                                        {isCellActive(rowIdx, 'status', 'workflow') && !isDraggingFill && (
-                                          <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
-                                        )}
-                                      </div>
-                                    )}
-                                  </td>
+                                    <td className="px-2 py-1" style={{ width: workflowColumnWidths.bobot, wordWrap: 'break-word' }}>
+                                      {row.type === 'sub' && (
+                                        <div className={`relative w-full ${isCellInSelection(rowIdx, 'bobot', 'workflow') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                                          onMouseEnter={() => handleFillMouseEnter(rowIdx, 'bobot', 'workflow')}>
+                                          <input type="number" value={row.bobot}
+                                            onFocus={() => handleCellFocus(rowIdx, 'bobot', 'workflow')}
+                                            onChange={(e) => updateWorkflowCell(rowIdx, 'bobot', parseInt(e.target.value) || 0)}
+                                            onPaste={(e) => handleWorkflowPaste(e, rowIdx, 2)}
+                                            className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded"
+                                            style={{ fontSize: 10 }}
+                                          />
+                                          {isCellActive(rowIdx, 'bobot', 'workflow') && !isDraggingFill && (
+                                            <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
+                                          )}
+                                        </div>
+                                      )}
+                                    </td>
 
-                                  <td className="px-2 py-1" style={{ width: workflowColumnWidths.progress, wordWrap: 'break-word' }}>
-                                    {row.type === 'sub' && (
-                                      <input
-                                        type="number" value={row.progress} readOnly
-                                        className="w-full px-2 py-1 bg-transparent border-0 focus:ring-0 text-gray-500 dark:text-white cursor-not-allowed"
-                                        style={{ fontSize: 10 }}
-                                      />
-                                    )}
-                                  </td>
+                                    <td className="px-2 py-1" style={{ width: workflowColumnWidths.target, wordWrap: 'break-word' }}>
+                                      {row.type === 'sub' && (
+                                        <div className={`relative w-full ${isCellInSelection(rowIdx, 'target', 'workflow') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                                          onMouseEnter={() => handleFillMouseEnter(rowIdx, 'target', 'workflow')}>
+                                          <textarea value={row.target}
+                                            onFocus={() => handleCellFocus(rowIdx, 'target', 'workflow')}
+                                            onChange={(e) => updateWorkflowCell(rowIdx, 'target', e.target.value)}
+                                            onPaste={(e) => handleWorkflowPaste(e, rowIdx, 3)}
+                                            className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded resize-none overflow-hidden"
+                                            style={{ fontSize: 10 }}
+                                            rows={1} onInput={autoResize}
+                                          />
+                                          {isCellActive(rowIdx, 'target', 'workflow') && !isDraggingFill && (
+                                            <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
+                                          )}
+                                        </div>
+                                      )}
+                                    </td>
 
-                                  <td className="px-1 py-1 text-center">
-                                    <button onClick={() => deleteWorkflowRow(rowIdx)} className="text-red-600 hover:text-red-800"><Trash2 size={16} /></button>
-                                  </td>
-                                </SortableRow>
-                              ))
-                            )}
-                          </SortableContext>
-                        </tbody>
-                        <tfoot className="bg-gray-100 dark:bg-gray-900 font-bold border-t-2 border-gray-300 dark:border-gray-600">
-                          <tr>
-                            <td colSpan={3} className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">TOTAL</td>
-                            <td className="px-2 py-2 text-gray-900 dark:text-white text-left">
-                              {workflowRows.filter(r => r.type === 'sub').reduce((sum, row) => sum + (row.bobot || 0), 0)}%
-                            </td>
-                            <td className="px-2 py-2"></td>
-                            <td className="px-2 py-2"></td>
-                            <td className="px-2 py-2 text-gray-900 dark:text-white text-left pl-3">
-                              {workflowRows.filter(r => r.type === 'sub').reduce((sum, row) => sum + (row.progress || 0), 0)}%
-                            </td>
-                            <td></td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </DndContext>
+                                    <td className="px-2 py-2" style={{ width: workflowColumnWidths.status, wordWrap: 'break-word' }}>
+                                      {row.type === 'sub' && (
+                                        <div className={`relative w-full ${isCellInSelection(rowIdx, 'status', 'workflow') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                                          onMouseEnter={() => handleFillMouseEnter(rowIdx, 'status', 'workflow')}>
+                                          <select value={row.status}
+                                            onFocus={() => handleCellFocus(rowIdx, 'status', 'workflow')}
+                                            onChange={(e) => updateWorkflowCell(rowIdx, 'status', e.target.value)}
+                                            className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded whitespace-normal [&>option]:text-gray-900 [&>option]:bg-white dark:[&>option]:text-gray-100 dark:[&>option]:bg-gray-800 [&>option]:whitespace-normal [&>option]:py-2"
+                                            style={{ fontSize: 10, whiteSpace: 'normal', wordWrap: 'break-word', overflowWrap: 'break-word', minHeight: 28, height: 'auto' }}
+                                          >
+                                            <option value="">-</option>
+                                            <option value="Not Started" style={{ whiteSpace: 'pre-line', wordBreak: 'break-word', fontSize: 12 }}>Not Started</option>
+                                            <option value="On Progress" style={{ whiteSpace: 'pre-line', wordBreak: 'break-word', fontSize: 12 }}>On Progress</option>
+                                            <option value="Done" style={{ whiteSpace: 'pre-line', wordBreak: 'break-word', fontSize: 12 }}>Done</option>
+                                          </select>
+                                          {isCellActive(rowIdx, 'status', 'workflow') && !isDraggingFill && (
+                                            <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
+                                          )}
+                                        </div>
+                                      )}
+                                    </td>
+
+                                    <td className="px-2 py-1" style={{ width: workflowColumnWidths.progress, wordWrap: 'break-word' }}>
+                                      {row.type === 'sub' && (
+                                        <input
+                                          type="number" value={row.progress} readOnly
+                                          className="w-full px-2 py-1 bg-transparent border-0 focus:ring-0 text-gray-500 dark:text-white cursor-not-allowed"
+                                          style={{ fontSize: 10 }}
+                                        />
+                                      )}
+                                    </td>
+
+                                    <td className="px-1 py-1 text-center">
+                                      <button onClick={() => deleteWorkflowRow(rowIdx)} className="text-red-600 hover:text-red-800"><Trash2 size={16} /></button>
+                                    </td>
+                                  </SortableRow>
+                                ))
+                              )}
+                            </SortableContext>
+                          </tbody>
+                          <tfoot className="bg-gray-100 dark:bg-gray-900 font-bold border-t-2 border-gray-300 dark:border-gray-600">
+                            <tr>
+                              <td colSpan={3} className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">TOTAL</td>
+                              <td className="px-2 py-2 text-gray-900 dark:text-white text-left">
+                                {workflowRows.filter(r => r.type === 'sub').reduce((sum, row) => sum + (row.bobot || 0), 0)}%
+                              </td>
+                              <td className="px-2 py-2"></td>
+                              <td className="px-2 py-2"></td>
+                              <td className="px-2 py-2 text-gray-900 dark:text-white text-left pl-3">
+                                {workflowRows.filter(r => r.type === 'sub').reduce((sum, row) => sum + (row.progress || 0), 0)}%
+                              </td>
+                              <td></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </DndContext>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1240,21 +1302,30 @@ export default function PageTab({
 
                     <div className="flex items-center gap-3 flex-wrap">
                       {/* Zoom Control */}
-                      <div className="flex items-center gap-2 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600">
-                        <ZoomOut size={14} className="text-gray-600 dark:text-gray-300" />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setProgressZoom(Math.max(30, progressZoom - 10))}
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                          title="Zoom Out"
+                        >
+                          <ZoomOut size={18} />
+                        </button>
                         <input
-                          type="range"
+                          type="number"
+                          value={progressZoom}
+                          onChange={(e) => setProgressZoom(Math.min(200, Math.max(30, Number(e.target.value) || 100)))}
+                          className="w-16 px-2 py-1 text-center border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
                           min="30"
                           max="200"
-                          value={progressZoom}
-                          onChange={(e) => setProgressZoom(Number(e.target.value))}
-                          className="w-24 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600"
-                          style={{
-                            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(progressZoom - 30) / 1.7}%, #e5e7eb ${(progressZoom - 30) / 1.7}%, #e5e7eb 100%)`
-                          }}
                         />
-                        <ZoomIn size={14} className="text-gray-600 dark:text-gray-300" />
-                        <span className="text-xs font-medium text-gray-700 dark:text-gray-200 min-w-[38px] text-center">{progressZoom}%</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">%</span>
+                        <button
+                          onClick={() => setProgressZoom(Math.min(200, progressZoom + 10))}
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                          title="Zoom In"
+                        >
+                          <ZoomIn size={18} />
+                        </button>
                       </div>
 
 
@@ -1277,175 +1348,182 @@ export default function PageTab({
                     </div>
                   </div>
 
-                  <div
-                    id="progress-table-container"
-                    className="overflow-x-auto max-h-96"
-                    style={{ transform: `scale(${progressZoom / 100})`, transformOrigin: 'top left', width: `${100 / (progressZoom / 100)}%` }}
-                  >
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEnd}
+                  <div className="overflow-auto" style={{ maxHeight: '600px' }}>
+                    <div
+                      id="progress-table-container"
+                      style={{
+                        zoom: progressZoom / 100,
+                        minWidth: 'max-content'
+                      }}
                     >
-                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
-                          <tr>
-                            <th className="px-1 py-2 w-8"></th>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: progressColumnWidths.date }}>
-                              Date
-                              <ResizeHandle table="progress" column="date" onResizeStart={handleColumnResizeStart} />
-                            </th>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: progressColumnWidths.activityType }}>
-                              Type
-                              <ResizeHandle table="progress" column="activityType" onResizeStart={handleColumnResizeStart} />
-                            </th>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: progressColumnWidths.description }}>
-                              Description
-                              <ResizeHandle table="progress" column="description" onResizeStart={handleColumnResizeStart} />
-                            </th>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: progressColumnWidths.targetIfPlan }}>
-                              Target
-                              <ResizeHandle table="progress" column="targetIfPlan" onResizeStart={handleColumnResizeStart} />
-                            </th>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: progressColumnWidths.pic }}>
-                              PIC
-                              <ResizeHandle table="progress" column="pic" onResizeStart={handleColumnResizeStart} />
-                            </th>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-red-600 dark:text-red-400 relative" style={{ width: progressColumnWidths.category }}>
-                              Cat 1
-                              <ResizeHandle table="progress" column="category" onResizeStart={handleColumnResizeStart} />
-                            </th>
-                            <th className="px-1 py-1 text-center w-8"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700" style={{ fontSize: 10 }}>
-                          <SortableContext
-                            items={progressRows.map(r => r.clientId)}
-                            strategy={verticalListSortingStrategy}
-                          >
-                            {progressRows.map((row, rowIdx) => {
-                              // Logic Cat 1 otomatis
-                              let cat1 = '';
-                              if (!row.activityType) cat1 = '';
-                              else if (row.activityType === 'Meeting Update' || row.activityType === 'Action Update') cat1 = 'Update';
-                              else cat1 = 'Plan';
-                              return (
-                                <SortableRow
-                                  key={row.clientId}
-                                  id={row.clientId}
-                                  className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${row.isDirty ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}`}
-                                >
-                                  <td className="px-2 py-1" style={{ width: progressColumnWidths.date, wordWrap: 'break-word' }}>
-                                    <div className={`relative w-full ${isCellInSelection(rowIdx, 'date', 'progress') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                                      onMouseEnter={() => handleFillMouseEnter(rowIdx, 'date', 'progress')}>
-                                      <input type="text" value={row.date}
-                                        onFocus={() => handleCellFocus(rowIdx, 'date', 'progress')}
-                                        onChange={(e) => updateProgressCell(rowIdx, 'date', e.target.value)}
-                                        onPaste={(e) => handleProgressPaste(e, rowIdx, 0)}
-                                        className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100"
-                                        style={{ fontSize: 10 }}
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                            <tr>
+                              <th className="px-1 py-2 w-8"></th>
+                              <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: progressColumnWidths.date }}>
+                                Date
+                                <ResizeHandle table="progress" column="date" onResizeStart={handleColumnResizeStart} />
+                              </th>
+                              <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: progressColumnWidths.activityType }}>
+                                Type
+                                <ResizeHandle table="progress" column="activityType" onResizeStart={handleColumnResizeStart} />
+                              </th>
+                              <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: progressColumnWidths.description }}>
+                                Description
+                                <ResizeHandle table="progress" column="description" onResizeStart={handleColumnResizeStart} />
+                              </th>
+                              <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: progressColumnWidths.targetIfPlan }}>
+                                <div>
+                                  Target
+                                  <div className="text-[9px] text-gray-500 dark:text-gray-400 font-normal">(if plan)</div>
+                                </div>
+                                <ResizeHandle table="progress" column="targetIfPlan" onResizeStart={handleColumnResizeStart} />
+                              </th>
+                              <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: progressColumnWidths.pic }}>
+                                PIC
+                                <ResizeHandle table="progress" column="pic" onResizeStart={handleColumnResizeStart} />
+                              </th>
+                              <th className="px-2 py-2 text-left text-xs font-medium text-red-600 dark:text-red-400 relative" style={{ width: progressColumnWidths.category }}>
+                                Cat 1
+                                <ResizeHandle table="progress" column="category" onResizeStart={handleColumnResizeStart} />
+                              </th>
+                              <th className="px-1 py-1 text-center w-8"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700" style={{ fontSize: 10 }}>
+                            <SortableContext
+                              items={progressRows.map(r => r.clientId)}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              {progressRows.map((row, rowIdx) => {
+                                // Logic Cat 1 otomatis
+                                let cat1 = '';
+                                if (!row.activityType) cat1 = '';
+                                else if (row.activityType === 'Meeting Update' || row.activityType === 'Action Update') cat1 = 'Update';
+                                else cat1 = 'Plan';
+                                return (
+                                  <SortableRow
+                                    key={row.clientId}
+                                    id={row.clientId}
+                                    className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${row.isDirty ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}`}
+                                  >
+                                    <td className="px-2 py-1" style={{ width: progressColumnWidths.date, wordWrap: 'break-word' }}>
+                                      <div className={`relative w-full ${isCellInSelection(rowIdx, 'date', 'progress') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                                        onMouseEnter={() => handleFillMouseEnter(rowIdx, 'date', 'progress')}>
+                                        <DateDisplayInput
+                                          value={row.date}
+                                          onChange={(value) => updateProgressCell(rowIdx, 'date', value)}
+                                          onFocus={() => handleCellFocus(rowIdx, 'date', 'progress')}
+                                          onPaste={(e) => handleProgressPaste(e, rowIdx, 0)}
+                                          className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100"
+                                          style={{ fontSize: 10 }}
+                                        />
+                                        {isCellActive(rowIdx, 'date', 'progress') && !isDraggingFill && (
+                                          <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-1 relative" style={{ width: progressColumnWidths.activityType, wordWrap: 'break-word' }}>
+                                      <div className={`relative w-full ${isCellInSelection(rowIdx, 'activityType', 'progress') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                                        onMouseEnter={() => handleFillMouseEnter(rowIdx, 'activityType', 'progress')}>
+                                        <select
+                                          value={row.activityType || ''}
+                                          onFocus={() => handleCellFocus(rowIdx, 'activityType', 'progress')}
+                                          onChange={e => updateProgressCell(rowIdx, 'activityType', e.target.value)}
+                                          className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded whitespace-normal [&>option]:text-gray-900 [&>option]:bg-white dark:[&>option]:text-gray-100 dark:[&>option]:bg-gray-800 [&>option]:whitespace-normal [&>option]:py-2"
+                                          style={{ fontSize: 10, whiteSpace: 'normal', wordWrap: 'break-word', overflowWrap: 'break-word', minHeight: 28, height: 'auto' }}
+                                        >
+                                          <option value="">-</option>
+                                          {masterData.activityTypes?.map((a: any) => (
+                                            <option key={a.name} value={a.name} style={{ whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{a.name}</option>
+                                          ))}
+                                        </select>
+                                        {isCellActive(rowIdx, 'activityType', 'progress') && !isDraggingFill && (
+                                          <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-1" style={{ width: progressColumnWidths.description, wordWrap: 'break-word' }}>
+                                      <div className={`relative w-full ${isCellInSelection(rowIdx, 'description', 'progress') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                                        onMouseEnter={() => handleFillMouseEnter(rowIdx, 'description', 'progress')}>
+                                        <textarea
+                                          value={row.description}
+                                          onFocus={() => handleCellFocus(rowIdx, 'description', 'progress')}
+                                          onChange={(e) => updateProgressCell(rowIdx, 'description', e.target.value)}
+                                          onPaste={(e) => {
+                                            e.preventDefault();
+                                            const pastedData = e.clipboardData.getData('text');
+                                            const normalized = pastedData.replace(/\r\n|\r/g, '\n');
+                                            updateProgressCell(rowIdx, 'description', normalized);
+                                          }}
+                                          className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded resize-none overflow-hidden"
+                                          style={{ fontSize: 10 }}
+                                          rows={1} onInput={autoResize}
+                                        />
+                                        {isCellActive(rowIdx, 'description', 'progress') && !isDraggingFill && (
+                                          <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-1" style={{ width: progressColumnWidths.targetIfPlan, wordWrap: 'break-word' }}>
+                                      <div className={`relative w-full ${isCellInSelection(rowIdx, 'targetIfPlan', 'progress') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                                        onMouseEnter={() => handleFillMouseEnter(rowIdx, 'targetIfPlan', 'progress')}>
+                                        <DateDisplayInput
+                                          value={row.targetIfPlan}
+                                          onChange={(value) => updateProgressCell(rowIdx, 'targetIfPlan', value)}
+                                          onFocus={() => handleCellFocus(rowIdx, 'targetIfPlan', 'progress')}
+                                          onPaste={(e) => handleProgressPaste(e, rowIdx, 3)}
+                                          className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100"
+                                          style={{ fontSize: 10 }}
+                                        />
+                                        {isCellActive(rowIdx, 'targetIfPlan', 'progress') && !isDraggingFill && (
+                                          <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-1" style={{ width: progressColumnWidths.pic, wordWrap: 'break-word' }}>
+                                      <div className={`relative w-full ${isCellInSelection(rowIdx, 'pic', 'progress') ? 'ring-2 ring-blue-500 z-10' : ''}`}
+                                        onMouseEnter={() => handleFillMouseEnter(rowIdx, 'pic', 'progress')}>
+                                        <textarea value={row.pic}
+                                          onFocus={() => handleCellFocus(rowIdx, 'pic', 'progress')}
+                                          onChange={(e) => updateProgressCell(rowIdx, 'pic', e.target.value)}
+                                          onPaste={(e) => handleProgressPaste(e, rowIdx, 4)}
+                                          className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded resize-none overflow-hidden"
+                                          style={{ fontSize: 10 }}
+                                          rows={1}
+                                          onInput={autoResize}
+                                        />
+                                        {isCellActive(rowIdx, 'pic', 'progress') && !isDraggingFill && (
+                                          <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-1" style={{ width: progressColumnWidths.category, wordWrap: 'break-word' }}>
+                                      <input
+                                        type="text"
+                                        value={cat1 || '-'}
+                                        readOnly
+                                        className={`w-full px-2 py-1 text-xs bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded font-semibold cursor-not-allowed break-words ${cat1 === 'Update' ? 'text-green-600 dark:text-green-400' : cat1 === 'Plan' ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}
+                                        style={{ fontSize: 11, wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal' }}
+                                        tabIndex={-1}
                                       />
-                                      {isCellActive(rowIdx, 'date', 'progress') && !isDraggingFill && (
-                                        <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-1 relative" style={{ width: progressColumnWidths.activityType, wordWrap: 'break-word' }}>
-                                    <div className={`relative w-full ${isCellInSelection(rowIdx, 'activityType', 'progress') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                                      onMouseEnter={() => handleFillMouseEnter(rowIdx, 'activityType', 'progress')}>
-                                      <select
-                                        value={row.activityType || ''}
-                                        onFocus={() => handleCellFocus(rowIdx, 'activityType', 'progress')}
-                                        onChange={e => updateProgressCell(rowIdx, 'activityType', e.target.value)}
-                                        className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded whitespace-normal [&>option]:text-gray-900 [&>option]:bg-white dark:[&>option]:text-gray-100 dark:[&>option]:bg-gray-800 [&>option]:whitespace-normal [&>option]:py-2"
-                                        style={{ fontSize: 10, whiteSpace: 'normal', wordWrap: 'break-word', overflowWrap: 'break-word', minHeight: 28, height: 'auto' }}
-                                      >
-                                        <option value="">-</option>
-                                        {masterData.activityTypes?.map((a: any) => (
-                                          <option key={a.name} value={a.name} style={{ whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{a.name}</option>
-                                        ))}
-                                      </select>
-                                      {isCellActive(rowIdx, 'activityType', 'progress') && !isDraggingFill && (
-                                        <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-1" style={{ width: progressColumnWidths.description, wordWrap: 'break-word' }}>
-                                    <div className={`relative w-full ${isCellInSelection(rowIdx, 'description', 'progress') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                                      onMouseEnter={() => handleFillMouseEnter(rowIdx, 'description', 'progress')}>
-                                      <textarea
-                                        value={row.description}
-                                        onFocus={() => handleCellFocus(rowIdx, 'description', 'progress')}
-                                        onChange={(e) => updateProgressCell(rowIdx, 'description', e.target.value)}
-                                        onPaste={(e) => {
-                                          e.preventDefault();
-                                          const pastedData = e.clipboardData.getData('text');
-                                          const normalized = pastedData.replace(/\r\n|\r/g, '\n');
-                                          updateProgressCell(rowIdx, 'description', normalized);
-                                        }}
-                                        className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded resize-none overflow-hidden"
-                                        style={{ fontSize: 10 }}
-                                        rows={1} onInput={autoResize}
-                                      />
-                                      {isCellActive(rowIdx, 'description', 'progress') && !isDraggingFill && (
-                                        <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-1" style={{ width: progressColumnWidths.targetIfPlan, wordWrap: 'break-word' }}>
-                                    <div className={`relative w-full ${isCellInSelection(rowIdx, 'targetIfPlan', 'progress') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                                      onMouseEnter={() => handleFillMouseEnter(rowIdx, 'targetIfPlan', 'progress')}>
-                                      <textarea value={row.targetIfPlan}
-                                        onFocus={() => handleCellFocus(rowIdx, 'targetIfPlan', 'progress')}
-                                        onChange={(e) => updateProgressCell(rowIdx, 'targetIfPlan', e.target.value)}
-                                        onPaste={(e) => handleProgressPaste(e, rowIdx, 3)}
-                                        className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded resize-none overflow-hidden"
-                                        style={{ fontSize: 10 }}
-                                        rows={1}
-                                        onInput={autoResize}
-                                      />
-                                      {isCellActive(rowIdx, 'targetIfPlan', 'progress') && !isDraggingFill && (
-                                        <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-1" style={{ width: progressColumnWidths.pic, wordWrap: 'break-word' }}>
-                                    <div className={`relative w-full ${isCellInSelection(rowIdx, 'pic', 'progress') ? 'ring-2 ring-blue-500 z-10' : ''}`}
-                                      onMouseEnter={() => handleFillMouseEnter(rowIdx, 'pic', 'progress')}>
-                                      <textarea value={row.pic}
-                                        onFocus={() => handleCellFocus(rowIdx, 'pic', 'progress')}
-                                        onChange={(e) => updateProgressCell(rowIdx, 'pic', e.target.value)}
-                                        onPaste={(e) => handleProgressPaste(e, rowIdx, 4)}
-                                        className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded resize-none overflow-hidden"
-                                        style={{ fontSize: 10 }}
-                                        rows={1}
-                                        onInput={autoResize}
-                                      />
-                                      {isCellActive(rowIdx, 'pic', 'progress') && !isDraggingFill && (
-                                        <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, rowIdx)} />
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-1" style={{ width: progressColumnWidths.category, wordWrap: 'break-word' }}>
-                                    <input
-                                      type="text"
-                                      value={cat1 || '-'}
-                                      readOnly
-                                      className={`w-full px-2 py-1 text-xs bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded font-semibold cursor-not-allowed break-words ${cat1 === 'Update' ? 'text-green-600 dark:text-green-400' : cat1 === 'Plan' ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}
-                                      style={{ fontSize: 11, wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal' }}
-                                      tabIndex={-1}
-                                    />
-                                  </td>
-                                  <td className="px-1 py-1 text-center">
-                                    <button onClick={() => deleteProgressRow(rowIdx)} className="text-red-600 hover:text-red-800"><Trash2 size={16} /></button>
-                                  </td>
-                                </SortableRow>
-                              );
-                            })}
-                          </SortableContext>
-                        </tbody>
-                      </table>
-                    </DndContext>
+                                    </td>
+                                    <td className="px-1 py-1 text-center">
+                                      <button onClick={() => deleteProgressRow(rowIdx)} className="text-red-600 hover:text-red-800"><Trash2 size={16} /></button>
+                                    </td>
+                                  </SortableRow>
+                                );
+                              })}
+                            </SortableContext>
+                          </tbody>
+                        </table>
+                      </DndContext>
+                    </div>
                   </div>
                 </div>
               </div>
