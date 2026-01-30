@@ -47,7 +47,7 @@ export default function ReportTab({ projects, masterData }: ReportTabProps) {
               {masterData.prioritas.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Kode</label>
             <select
@@ -59,7 +59,7 @@ export default function ReportTab({ projects, masterData }: ReportTabProps) {
               {masterData.kodes.map((k: any) => <option key={k.id} value={k.name}>{k.name}</option>)}
             </select>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Branch</label>
             <select
@@ -71,7 +71,7 @@ export default function ReportTab({ projects, masterData }: ReportTabProps) {
               {masterData.branches.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">PIC</label>
             <select
@@ -102,7 +102,7 @@ export default function ReportTab({ projects, masterData }: ReportTabProps) {
               'STOP': 'bg-black dark:bg-gray-800',
               'Selesai': 'bg-blue-500 dark:bg-blue-600',
             };
-            
+
             return (
               <div key={priority}>
                 <div className="flex justify-between mb-2">
@@ -127,7 +127,7 @@ export default function ReportTab({ projects, masterData }: ReportTabProps) {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-blue-50 dark:bg-gray-900">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Code</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Branch</th>
@@ -148,7 +148,7 @@ export default function ReportTab({ projects, masterData }: ReportTabProps) {
                 </tr>
               ) : (
                 filteredProjects.map((project: any) => (
-                  <tr key={project.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                  <tr key={project.id} className="hover:bg-gray-100 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{project.code}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{project.branch?.name}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{project.namaCalonMitra}</td>

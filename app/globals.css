@@ -26,7 +26,13 @@ input[type="date"].dark\:calendar-white::-ms-calendar-picker-indicator {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    color-scheme: dark; /* Ensures native inputs like date pickers use dark theme (white icon) */
   }
+}
+
+/* Force dark color scheme when dark mode class is present on html/body */
+.dark {
+  color-scheme: dark;
 }
 
 body {

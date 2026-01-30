@@ -383,10 +383,15 @@ export default function PKROpexTab({
     // Sort by sortOrder if available (preserves user's manual order)
     // Otherwise keep original order from backend
     const sortedRows = opexRows.sort((a, b) => {
+      // Prioritize rows with sortOrder
       if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
         return a.sortOrder - b.sortOrder;
       }
-      return 0; // Keep original order if no sortOrder
+      // If only one has sortOrder, put it first
+      if (a.sortOrder !== undefined) return -1;
+      if (b.sortOrder !== undefined) return 1;
+
+      return 0; // Keep original order if neither has sortOrder
     });
 
     setRows(sortedRows);
@@ -495,6 +500,7 @@ export default function PKROpexTab({
             updatedRows[i] = {
               ...updatedRows[i],
               id: savedData.id || row.id,
+              sortOrder: i, // Ensure sortOrder is kept in sync logic
               isDirty: false,
               isNew: false
             };

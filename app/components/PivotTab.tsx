@@ -41,7 +41,7 @@ export default function PivotTab({ projects, masterData }: PivotTabProps) {
             'STOP': 'bg-black border-gray-800 dark:bg-gray-900 dark:border-gray-700',
             'Selesai': 'bg-blue-100 border-blue-300 dark:bg-blue-900 dark:border-blue-700',
           };
-          
+
           return (
             <div
               key={priority}
@@ -56,13 +56,13 @@ export default function PivotTab({ projects, masterData }: PivotTabProps) {
 
       {/* Project Summary Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
-        <div className="px-6 py-4 bg-blue-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Sum of % Progress</h3>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-blue-50 dark:bg-gray-900">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Code</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Partnership</th>
@@ -84,7 +84,7 @@ export default function PivotTab({ projects, masterData }: PivotTabProps) {
                 </tr>
               ) : (
                 projectSummary.map((project, index) => (
-                  <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                  <tr key={index} className="hover:bg-gray-100 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{project.code}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{project.partnership}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{project.branch}</td>
