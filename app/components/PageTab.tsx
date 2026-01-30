@@ -664,8 +664,22 @@ export default function PageTab({
         }
       }
 
-      if (workflowChanges) setWorkflowRows(updatedWorkflows);
-      if (progressChanges) setProgressRows(updatedProgress);
+      if (workflowChanges) {
+        setWorkflowRows(updatedWorkflows);
+        // Sync to parent Workflows state
+        setWorkflows(prev => [
+          ...prev.filter(w => w.pageId !== selectedPageId),
+          ...updatedWorkflows
+        ]);
+      }
+      if (progressChanges) {
+        setProgressRows(updatedProgress);
+        // Sync to parent DailyProgress state
+        setDailyProgress(prev => [
+          ...prev.filter(p => p.pageId !== selectedPageId),
+          ...updatedProgress
+        ]);
+      }
 
       setSaveStatus('saved');
     } catch (error) {

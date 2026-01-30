@@ -242,7 +242,7 @@ export default function PartnershipTab({
   // ===== AUTO-CALCULATION FUNCTIONS =====
 
   // Calculate % Progress from workflows
-  // Calculate % Progress: Sum of all SUB workflow progress / 2
+  // Calculate % Progress: Sum of all SUB workflow progress (Matches PageTab Total Row)
   const calculateProgress = (code: string): number => {
     if (!code || !pages || !workflows) return 0;
     const page = pages.find(p => p.pageNumber === code);
@@ -252,9 +252,8 @@ export default function PartnershipTab({
     if (pageWorkflows.length === 0) return 0;
 
     const totalProgress = pageWorkflows.reduce((sum, w) => sum + (w.progress || 0), 0);
-    // User requested "sum entire column progress... or sum all then / 2". 
-    // Implementing sum all then / 2.
-    return Math.round(totalProgress / 2);
+    // User requested "select from the Total row" which is a simple SUM of sub-tasks in PageTab.
+    return totalProgress;
   };
 
   // Helper to categorize daily progress
@@ -1001,8 +1000,8 @@ export default function PartnershipTab({
                                 onFocus={() => handleCellFocus(idx, 'jenisKerjaSama')}
                                 onPaste={(e) => handlePaste(e, idx, 6)}
                                 onInput={autoResize}
-                                className="w-full px-2 py-1 text-sm bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 resize-none overflow-hidden"
-                                rows={1}
+                                className="w-full px-2 py-1 text-sm bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 resize-none overflow-hidden whitespace-pre-wrap"
+                                rows={Math.max(1, (row.jenisKerjaSama || '').split('\n').length)}
                               />
                               {isCellActive(idx, 'jenisKerjaSama') && (
                                 <div
