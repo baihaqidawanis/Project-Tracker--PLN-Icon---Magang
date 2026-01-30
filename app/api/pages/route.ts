@@ -47,18 +47,25 @@ export async function POST(request: Request) {
 
     console.log('[API POST] Created page:', page);
 
-    // Auto-create Partnership (Project) row
+    // Auto-create or Update Partnership (Project) row
     try {
-      const project = await prisma.project.create({
-        data: {
-          code: data.pageNumber, // Auto-populate code from pageNumber
-          namaCalonMitra: data.partnershipName, // Auto-populate from partnershipName
+      // We use upsert here to handle cases where a Project with this code might already exist 
+      // (e.g., from a previously deleted Page where the Project row wasn't cleaned up)
+      const project = await prisma.project.upsert({
+        where: { code: data.pageNumber },
+        update: {
+          namaCalonMitra: data.partnershipName,
+          // Re-activate or reset fields if needed, but primarily we sync the name
+        },
+        create: {
+          code: data.pageNumber,
+          namaCalonMitra: data.partnershipName,
         },
       });
-      console.log('[API POST] Auto-created Partnership row:', project);
+      console.log('[API POST] Auto-synced Partnership row:', project);
     } catch (projectError) {
-      console.error('[API POST] Failed to auto-create Partnership row:', projectError);
-      // Don't fail the entire request if Partnership creation fails
+      console.error('[API POST] Failed to auto-sync Partnership row:', projectError);
+      // Don't fail the entire request if Partnership sync fails
     }
 
     return NextResponse.json(page);
@@ -146,11 +153,46 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
+    // 1. Fetch page details before deleting to get the PageNumber (Code)
+    const pageToDelete = await prisma.page.findUnique({
+      where: { id: parseInt(id) },
+    });
+
+    if (!pageToDelete) {
+      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+    }
+
+    const pageNumber = pageToDelete.pageNumber;
+
+    // 2. Delete the Page
     await prisma.page.delete({
       where: { id: parseInt(id) },
     });
+
+    console.log('[API DELETE] Deleted page:', id, pageNumber);
+
+    // 3. Delete the corresponding Partnership (Project) row
+    try {
+      const projectToDelete = await prisma.project.findFirst({
+        where: { code: pageNumber },
+      });
+
+      if (projectToDelete) {
+        await prisma.project.delete({
+          where: { id: projectToDelete.id },
+        });
+        console.log('[API DELETE] Deleted corresponding Partnership row for code:', pageNumber);
+      } else {
+        console.warn('[API DELETE] No corresponding Partnership found to delete for code:', pageNumber);
+      }
+    } catch (projectError) {
+      console.error('[API DELETE] Failed to delete Partnership row:', projectError);
+      // We don't error out the main request if this fails, as the primary action (delete page) succeeded
+    }
+
     return NextResponse.json({ message: 'Page deleted successfully' });
   } catch (error) {
+    console.error('[API DELETE] Error:', error);
     return NextResponse.json({ error: 'Failed to delete page' }, { status: 500 });
   }
 }

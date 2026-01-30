@@ -65,6 +65,7 @@ export async function PUT(
     // Prepare update data
     const updateData: any = {
       code: data.code,
+      kode: data.kode, // Added missing field
       branchId: parseId(data.branchId),
       namaCalonMitra: data.namaCalonMitra,
       prioritasId: parseId(data.prioritasId),

@@ -670,6 +670,7 @@ export default function PartnershipTab({
         // Prepare clean data with proper types
         const payload = {
           code: row.code || '',
+          kode: row.kode || '', // Added missing field
           branchId: branchId ? parseInt(String(branchId)) : 0,
           namaCalonMitra: row.namaCalonMitra || '',
           prioritasId: prioritasId ? parseInt(String(prioritasId)) : 0,
