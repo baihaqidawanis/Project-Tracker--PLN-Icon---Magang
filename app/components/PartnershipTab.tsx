@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, ClipboardEvent } from 'react';
-import { Plus, Trash2, GripVertical, ZoomIn, ZoomOut, Maximize2, Minimize2 } from 'lucide-react';
+import { Plus, Trash2, GripVertical, ZoomIn, ZoomOut, Maximize2, Minimize2, CheckCircle, Loader2 } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -20,7 +20,27 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Select from 'react-select';
-import { formatDateShort, formatDateForInput } from '../utils/date-utils';
+
+// Helper functions for date formatting (add these if not in utils)
+const formatDateShort = (dateString: string): string => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch {
+    return dateString;
+  }
+};
+
+const formatDateForInput = (dateString: string): string => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  } catch {
+    return '';
+  }
+};
 
 interface PartnershipRow {
   clientId: string;
@@ -133,6 +153,8 @@ export default function PartnershipTab({
 
   const [rows, setRows] = useState<PartnershipRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [zoom, setZoom] = useState(100);
   const [zoomInput, setZoomInput] = useState('100');
@@ -166,6 +188,9 @@ export default function PartnershipTab({
   const widthsRef = useRef(columnWidths);
   widthsRef.current = columnWidths;
 
+  // Track if component has mounted
+  const hasMountedRef = useRef(false);
+
   // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -183,35 +208,43 @@ export default function PartnershipTab({
       if (savedWidths) {
         try {
           setColumnWidths(prev => ({ ...prev, ...JSON.parse(savedWidths) }));
-        } catch (e) { console.error('Failed to parse saved widths', e); }
+        } catch (e) {
+          console.error('Failed to parse saved widths', e);
+        }
       }
-      if (savedZoom) setZoom(parseInt(savedZoom));
+      if (savedZoom) {
+        const parsedZoom = parseInt(savedZoom);
+        if (!isNaN(parsedZoom)) {
+          setZoom(parsedZoom);
+        }
+      }
+
+      // Mark as mounted
+      hasMountedRef.current = true;
     }
   }, []);
 
-  // Save widths when resizing ends
+  // Save widths whenever they change (but not on initial mount)
   useEffect(() => {
-    if (!resizingColumn) {
-      localStorage.setItem(STORAGE_KEY_WIDTHS, JSON.stringify(widthsRef.current));
+    if (typeof window !== 'undefined' && hasMountedRef.current) {
+      localStorage.setItem(STORAGE_KEY_WIDTHS, JSON.stringify(columnWidths));
     }
-  }, [resizingColumn]);
+  }, [columnWidths]);
 
   // Save zoom
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_ZOOM, zoom.toString());
-    setZoomInput(zoom.toString());
-  }, [zoom]);
-
-  // Save zoom
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_ZOOM, zoom.toString());
-    setZoomInput(zoom.toString());
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_ZOOM, zoom.toString());
+      setZoomInput(zoom.toString());
+    }
   }, [zoom]);
 
   // ===== AUTO-CALCULATION FUNCTIONS =====
 
   // Calculate % Progress from workflows
   const calculateProgress = (code: string): number => {
+    if (!code || !pages || !workflows) return 0;
+
     const page = pages.find(p => p.pageNumber === code);
     if (!page) return 0;
 
@@ -224,6 +257,8 @@ export default function PartnershipTab({
 
   // Get latest date updated from daily progress (category = "Update")
   const getLatestDateUpdated = (code: string): string => {
+    if (!code || !pages || !dailyProgress) return '';
+
     const page = pages.find(p => p.pageNumber === code);
     if (!page) return '';
 
@@ -241,6 +276,8 @@ export default function PartnershipTab({
 
   // Get latest update description from daily progress (category = "Update")
   const getLatestUpdate = (code: string): string => {
+    if (!code || !pages || !dailyProgress) return '';
+
     const page = pages.find(p => p.pageNumber === code);
     if (!page) return '';
 
@@ -258,6 +295,8 @@ export default function PartnershipTab({
 
   // Get action plan from daily progress (category = "Plan")
   const getActionPlan = (code: string): string => {
+    if (!code || !pages || !dailyProgress) return '';
+
     const page = pages.find(p => p.pageNumber === code);
     if (!page) return '';
 
@@ -275,6 +314,8 @@ export default function PartnershipTab({
 
   // Get target date from daily progress (category = "Plan")
   const getTargetDate = (code: string): string => {
+    if (!code || !pages || !dailyProgress) return '';
+
     const page = pages.find(p => p.pageNumber === code);
     if (!page) return '';
 
@@ -292,6 +333,8 @@ export default function PartnershipTab({
 
   // Get latest activity from workflows (hierarchical: On Progress -> Not Started -> Done, search bottom-to-top)
   const getLatestActivity = (code: string): string => {
+    if (!code || !pages || !workflows) return '';
+
     const page = pages.find(p => p.pageNumber === code);
     if (!page) return '';
 
@@ -316,6 +359,8 @@ export default function PartnershipTab({
 
   // Get latest activity status from workflows (same logic as getLatestActivity)
   const getLatestActivityStatus = (code: string): string => {
+    if (!code || !pages || !workflows || !masterData?.statuses) return '';
+
     const page = pages.find(p => p.pageNumber === code);
     if (!page) return '';
 
@@ -349,12 +394,18 @@ export default function PartnershipTab({
 
   // Load data into editable state with auto-calculations
   useEffect(() => {
+    if (!projects || !Array.isArray(projects)) {
+      setRows([]);
+      return;
+    }
+
     const partnershipRows = projects.map((p, index) => {
       const code = p.code || '';
 
       return {
         ...p,
         clientId: p.id ? p.id.toString() : `temp-${index}`,
+        code: code,
         branchId: p.branchId || '',
         prioritasId: p.prioritasId || '',
         picId: p.picId || '',
@@ -368,21 +419,26 @@ export default function PartnershipTab({
         latestActivityStatusId: getLatestActivityStatus(code),
         // Other fields
         kode: p.kode || '',
+        namaCalonMitra: p.namaCalonMitra || '',
+        jenisKerjaSama: p.jenisKerjaSama || '',
         linkDokumen: p.linkDokumen || '',
-        sortOrder: p.sortOrder || index,
+        sortOrder: p.sortOrder !== undefined ? p.sortOrder : index,
         isDirty: false,
         isNew: false,
       };
     });
 
-    // Sort by sortOrder first, then by code numerically
+    // Sort by sortOrder (user's manual order)
     const sorted = partnershipRows.sort((a, b) => {
-      // If both have sortOrder, use that
-      if (a.sortOrder !== undefined && b.sortOrder !== undefined && a.sortOrder !== b.sortOrder) {
+      // Prioritize rows with sortOrder
+      if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
         return a.sortOrder - b.sortOrder;
       }
+      // If only one has sortOrder, put it first
+      if (a.sortOrder !== undefined) return -1;
+      if (b.sortOrder !== undefined) return 1;
 
-      // Otherwise, sort by code numerically (P.01, P.02, P.03, etc.)
+      // Fallback: sort by code numerically (P.01, P.02, P.03, etc.)
       const extractNumber = (code: string) => {
         const match = code.match(/\d+/);
         return match ? parseInt(match[0]) : 0;
@@ -392,7 +448,7 @@ export default function PartnershipTab({
     });
 
     setRows(sorted);
-  }, [projects, pages, workflows, dailyProgress]);
+  }, [projects, pages, workflows, dailyProgress, masterData]);
 
   // Global event handlers
   useEffect(() => {
@@ -462,6 +518,26 @@ export default function PartnershipTab({
       return newRows;
     });
   };
+
+  // Auto-save effect
+  useEffect(() => {
+    const hasDirtyRows = rows.some(row => row.isDirty);
+    if (hasDirtyRows) {
+      // Clear existing timer
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      // Set new timer (1 second debounce)
+      autoSaveTimerRef.current = setTimeout(() => {
+        saveDirtyRows();
+      }, 1000);
+    }
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [rows]);
 
   const addRow = () => {
     const newRow: PartnershipRow = {
@@ -609,42 +685,108 @@ export default function PartnershipTab({
     });
   };
 
-  const saveAllChanges = async () => {
-    setSaving(true);
+  // Auto-save function (optimized with parallel requests)
+  const saveDirtyRows = async () => {
+    setSaveStatus('saving');
     try {
       const updatedRows = [...rows];
-      for (let i = 0; i < updatedRows.length; i++) {
-        const row = updatedRows[i];
-        if (row.isDirty) {
-          const method = row.isNew ? 'POST' : 'PUT';
-          const url = row.isNew ? '/api/projects' : `/api/projects/${row.id}`;
-          const { isDirty, isNew, branch, prioritas, pic, latestActivityStatus, clientId, ...cleanRow } = row;
+      const dirtyRows = updatedRows
+        .map((row, index) => ({ row, index }))
+        .filter(({ row }) => row.isDirty);
 
+      if (dirtyRows.length === 0) {
+        setSaveStatus('saved');
+        return;
+      }
+
+      // Save all dirty rows in parallel
+      const savePromises = dirtyRows.map(async ({ row, index }) => {
+        const method = row.isNew ? 'POST' : 'PUT';
+        const url = row.isNew ? '/api/projects' : `/api/projects/${row.id}`;
+
+        // Properly extract IDs from objects or use existing values
+        const branchId = typeof row.branchId === 'object' && row.branchId !== null
+          ? (row.branchId as any).id
+          : row.branchId;
+        const prioritasId = typeof row.prioritasId === 'object' && row.prioritasId !== null
+          ? (row.prioritasId as any).id
+          : row.prioritasId;
+        const picId = typeof row.picId === 'object' && row.picId !== null
+          ? (row.picId as any).id
+          : row.picId;
+        const latestActivityStatusId = typeof row.latestActivityStatusId === 'object' && row.latestActivityStatusId !== null
+          ? (row.latestActivityStatusId as any).id
+          : row.latestActivityStatusId;
+
+        // Prepare clean data with proper types
+        const payload = {
+          code: row.code || '',
+          branchId: branchId ? parseInt(String(branchId)) : 0,
+          namaCalonMitra: row.namaCalonMitra || '',
+          prioritasId: prioritasId ? parseInt(String(prioritasId)) : 0,
+          picId: picId ? parseInt(String(picId)) : 0,
+          jenisKerjaSama: row.jenisKerjaSama || '',
+          progressPercentage: parseInt(String(row.progressPercentage)) || 0,
+          latestUpdate: row.latestUpdate || '',
+          actionPlan: row.actionPlan || '',
+          targetDate: row.targetDate || null,
+          linkDokumen: row.linkDokumen || '',
+          latestActivity: row.latestActivity || '',
+          latestActivityStatusId: latestActivityStatusId ? parseInt(String(latestActivityStatusId)) : null,
+          sortOrder: index
+        };
+
+        try {
           const res = await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...cleanRow, sortOrder: i })
+            body: JSON.stringify(payload)
           });
 
           if (res.ok) {
             const savedData = await res.json();
-            updatedRows[i] = {
-              ...updatedRows[i],
-              id: savedData.id || row.id,
-              sortOrder: i,
-              isNew: false,
-              isDirty: false
-            };
+            return { index, savedData, success: true };
+          } else {
+            const errorText = await res.text();
+            console.error(`Failed to save row ${index}:`, res.status, errorText);
+            return { index, success: false, error: errorText };
           }
+        } catch (err) {
+          console.error(`Error saving row ${index}:`, err);
+          return { index, success: false, error: String(err) };
         }
-      }
+      });
+
+      const results = await Promise.all(savePromises);
+
+      // Update rows with saved data
+      results.forEach(result => {
+        if (result.success && result.savedData) {
+          updatedRows[result.index] = {
+            ...updatedRows[result.index],
+            id: result.savedData.id || updatedRows[result.index].id,
+            sortOrder: result.index,
+            isDirty: false,
+            isNew: false
+          };
+        }
+      });
+
+      const allSuccess = results.every(r => r.success);
       setRows(updatedRows);
-      window.location.reload();
+      setSaveStatus(allSuccess ? 'saved' : 'error');
+
     } catch (error) {
       console.error('Error saving:', error);
-    } finally {
-      setSaving(false);
+      setSaveStatus('error');
     }
+  };
+
+  // Manual save (for backward compatibility)
+  const saveAllChanges = async () => {
+    setSaving(true);
+    await saveDirtyRows();
+    setSaving(false);
   };
 
   const handleZoomChange = (newZoom: number) => {
@@ -720,6 +862,23 @@ export default function PartnershipTab({
             {fullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
           </button>
 
+          {/* Auto-save Status */}
+          <div className="flex items-center gap-2">
+            {saveStatus === 'saving' && (
+              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
+                <Loader2 size={14} className="animate-spin" /> Saving...
+              </span>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="text-xs text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
+                <CheckCircle size={14} /> All saved
+              </span>
+            )}
+            {saveStatus === 'error' && (
+              <span className="text-xs text-red-600 dark:text-red-400 font-medium">Error saving</span>
+            )}
+          </div>
+
           <button
             onClick={addRow}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
@@ -730,7 +889,7 @@ export default function PartnershipTab({
         </div>
       </div>
 
-      {/* Table - Updated: Numeric sorting, Excel-like zoom, scrollable */}
+      {/* Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
         <div className="overflow-auto" style={{ maxHeight: '600px' }}>
           <div style={{
@@ -846,7 +1005,7 @@ export default function PartnershipTab({
                               className="w-full px-2 py-1 text-sm bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 dark:bg-gray-800"
                             >
                               <option value="">Select</option>
-                              {masterData.kodes?.map((k: any) => (
+                              {masterData?.kodes?.map((k: any) => (
                                 <option key={k.id} value={k.name}>{k.name}</option>
                               ))}
                             </select>
@@ -860,7 +1019,7 @@ export default function PartnershipTab({
                               className="w-full px-2 py-1 text-sm bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 dark:bg-gray-800"
                             >
                               <option value="">Select</option>
-                              {masterData.branches?.map((b: any) => (
+                              {masterData?.branches?.map((b: any) => (
                                 <option key={b.id} value={b.id}>{b.name}</option>
                               ))}
                             </select>
@@ -896,7 +1055,7 @@ export default function PartnershipTab({
                               className="w-full px-2 py-1 text-sm bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 dark:bg-gray-800"
                             >
                               <option value="">Select</option>
-                              {masterData.prioritas?.map((p: any) => (
+                              {masterData?.prioritas?.map((p: any) => (
                                 <option key={p.id} value={p.id}>{p.name}</option>
                               ))}
                             </select>
@@ -910,7 +1069,7 @@ export default function PartnershipTab({
                               className="w-full px-2 py-1 text-sm bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 dark:bg-gray-800"
                             >
                               <option value="">Select</option>
-                              {masterData.pics?.map((p: any) => (
+                              {masterData?.pics?.map((p: any) => (
                                 <option key={p.id} value={p.id}>{p.name}</option>
                               ))}
                             </select>
@@ -938,90 +1097,38 @@ export default function PartnershipTab({
                             </div>
                           </td>
 
-                          {/* Progress % */}
+                          {/* Progress % - READ ONLY (auto-calculated) */}
                           <td className="px-2 py-1" style={{ width: columnWidths.progressPercentage }}>
-                            <div className={`relative ${isCellInSelection(idx, 'progressPercentage') ? 'ring-2 ring-blue-500' : ''}`}
-                              onMouseEnter={() => handleFillMouseEnter(idx, 'progressPercentage')}>
-                              <input
-                                type="number"
-                                value={row.progressPercentage}
-                                onChange={(e) => updateCell(idx, 'progressPercentage', parseInt(e.target.value) || 0)}
-                                onFocus={() => handleCellFocus(idx, 'progressPercentage')}
-                                onPaste={(e) => handlePaste(e, idx, 7)}
-                                className="w-full px-2 py-1 text-sm bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100"
-                                min="0"
-                                max="100"
-                              />
-                              {isCellActive(idx, 'progressPercentage') && (
-                                <div
-                                  className="absolute bottom-0 right-0 w-2 h-2 bg-blue-600 cursor-crosshair"
-                                  onMouseDown={(e) => handleFillMouseDown(e, idx)}
-                                />
-                              )}
+                            <div className="w-full px-2 py-1 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded">
+                              {row.progressPercentage}%
                             </div>
                           </td>
 
-                          {/* Latest Date Updated */}
+                          {/* Latest Date Updated - READ ONLY (auto-calculated) */}
                           <td className="px-2 py-1" style={{ width: columnWidths.latestDateUpdated }}>
-                            <div className={`relative ${isCellInSelection(idx, 'latestDateUpdated') ? 'ring-2 ring-blue-500' : ''}`}
-                              onMouseEnter={() => handleFillMouseEnter(idx, 'latestDateUpdated')}>
-                              <div className="w-full px-2 py-1 text-sm text-gray-600 dark:text-gray-300">
-                                {row.latestDateUpdated ? formatDateShort(row.latestDateUpdated) : '-'}
-                              </div>
+                            <div className="w-full px-2 py-1 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded">
+                              {row.latestDateUpdated ? formatDateShort(row.latestDateUpdated) : '-'}
                             </div>
                           </td>
 
-                          {/* Latest Update */}
+                          {/* Latest Update - READ ONLY (auto-calculated) */}
                           <td className="px-2 py-1" style={{ width: columnWidths.latestUpdate }}>
-                            <div className={`relative ${isCellInSelection(idx, 'latestUpdate') ? 'ring-2 ring-blue-500' : ''}`}
-                              onMouseEnter={() => handleFillMouseEnter(idx, 'latestUpdate')}>
-                              <textarea
-                                value={row.latestUpdate}
-                                onChange={(e) => updateCell(idx, 'latestUpdate', e.target.value)}
-                                onFocus={() => handleCellFocus(idx, 'latestUpdate')}
-                                onPaste={(e) => handlePaste(e, idx, 9)}
-                                onInput={autoResize}
-                                className="w-full px-2 py-1 text-sm bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 resize-none overflow-hidden"
-                                rows={1}
-                              />
-                              {isCellActive(idx, 'latestUpdate') && (
-                                <div
-                                  className="absolute bottom-0 right-0 w-2 h-2 bg-blue-600 cursor-crosshair"
-                                  onMouseDown={(e) => handleFillMouseDown(e, idx)}
-                                />
-                              )}
+                            <div className="w-full px-2 py-1 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded max-h-20 overflow-auto">
+                              {row.latestUpdate || '-'}
                             </div>
                           </td>
 
-                          {/* Action Plan */}
+                          {/* Action Plan - READ ONLY (auto-calculated) */}
                           <td className="px-2 py-1" style={{ width: columnWidths.actionPlan }}>
-                            <div className={`relative ${isCellInSelection(idx, 'actionPlan') ? 'ring-2 ring-blue-500' : ''}`}
-                              onMouseEnter={() => handleFillMouseEnter(idx, 'actionPlan')}>
-                              <textarea
-                                value={row.actionPlan}
-                                onChange={(e) => updateCell(idx, 'actionPlan', e.target.value)}
-                                onFocus={() => handleCellFocus(idx, 'actionPlan')}
-                                onPaste={(e) => handlePaste(e, idx, 10)}
-                                onInput={autoResize}
-                                className="w-full px-2 py-1 text-sm bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 resize-none overflow-hidden"
-                                rows={1}
-                              />
-                              {isCellActive(idx, 'actionPlan') && (
-                                <div
-                                  className="absolute bottom-0 right-0 w-2 h-2 bg-blue-600 cursor-crosshair"
-                                  onMouseDown={(e) => handleFillMouseDown(e, idx)}
-                                />
-                              )}
+                            <div className="w-full px-2 py-1 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded max-h-20 overflow-auto">
+                              {row.actionPlan || '-'}
                             </div>
                           </td>
 
-                          {/* Target Date */}
+                          {/* Target Date - READ ONLY (auto-calculated) */}
                           <td className="px-2 py-1" style={{ width: columnWidths.targetDate }}>
-                            <div className={`relative ${isCellInSelection(idx, 'targetDate') ? 'ring-2 ring-blue-500' : ''}`}
-                              onMouseEnter={() => handleFillMouseEnter(idx, 'targetDate')}>
-                              <div className="w-full px-2 py-1 text-sm text-gray-600 dark:text-gray-300">
-                                {row.targetDate ? formatDateShort(row.targetDate) : '-'}
-                              </div>
+                            <div className="w-full px-2 py-1 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded">
+                              {row.targetDate ? formatDateShort(row.targetDate) : '-'}
                             </div>
                           </td>
 
@@ -1047,40 +1154,21 @@ export default function PartnershipTab({
                             </div>
                           </td>
 
-                          {/* Latest Activity */}
+                          {/* Latest Activity - READ ONLY (auto-calculated) */}
                           <td className="px-2 py-1" style={{ width: columnWidths.latestActivity }}>
-                            <div className={`relative ${isCellInSelection(idx, 'latestActivity') ? 'ring-2 ring-blue-500' : ''}`}
-                              onMouseEnter={() => handleFillMouseEnter(idx, 'latestActivity')}>
-                              <textarea
-                                value={row.latestActivity}
-                                onChange={(e) => updateCell(idx, 'latestActivity', e.target.value)}
-                                onFocus={() => handleCellFocus(idx, 'latestActivity')}
-                                onPaste={(e) => handlePaste(e, idx, 13)}
-                                onInput={autoResize}
-                                className="w-full px-2 py-1 text-sm bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 resize-none overflow-hidden"
-                                rows={1}
-                              />
-                              {isCellActive(idx, 'latestActivity') && (
-                                <div
-                                  className="absolute bottom-0 right-0 w-2 h-2 bg-blue-600 cursor-crosshair"
-                                  onMouseDown={(e) => handleFillMouseDown(e, idx)}
-                                />
-                              )}
+                            <div className="w-full px-2 py-1 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded max-h-20 overflow-auto">
+                              {row.latestActivity || '-'}
                             </div>
                           </td>
 
-                          {/* Activity Status - Dropdown */}
+                          {/* Activity Status - READ ONLY (auto-calculated) */}
                           <td className="px-2 py-1" style={{ width: columnWidths.latestActivityStatus }}>
-                            <select
-                              value={row.latestActivityStatusId}
-                              onChange={(e) => updateCell(idx, 'latestActivityStatusId', e.target.value)}
-                              className="w-full px-2 py-1 text-sm bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 dark:bg-gray-800"
-                            >
-                              <option value="">Select</option>
-                              {masterData.statuses?.map((s: any) => (
-                                <option key={s.id} value={s.id}>{s.name}</option>
-                              ))}
-                            </select>
+                            <div className="w-full px-2 py-1 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded">
+                              {row.latestActivityStatusId ?
+                                masterData?.statuses?.find((s: any) => s.id === parseInt(String(row.latestActivityStatusId)))?.name || '-'
+                                : '-'
+                              }
+                            </div>
                           </td>
 
                           {/* Action */}
@@ -1101,7 +1189,7 @@ export default function PartnershipTab({
             </DndContext>
           </div>
         </div>
-      </div >
-    </div >
+      </div>
+    </div>
   );
 }

@@ -91,6 +91,7 @@ model Project {
   latestActivity          String?
   latestActivityStatusId  Int?
   latestActivityStatus    MasterStatus?  @relation(fields: [latestActivityStatusId], references: [id])
+  sortOrder               Int            @default(0)
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
 }
@@ -148,6 +149,7 @@ model PKROpex {
   saldoPRK        Decimal? @db.Decimal(15, 2)
   evidence        String?
   pic             String
+  sortOrder       Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

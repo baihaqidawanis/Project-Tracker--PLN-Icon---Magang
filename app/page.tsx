@@ -263,8 +263,8 @@ export default function ProjectTracker() {
           className={`transition-all duration-300 ${shouldHideNavigation
             ? 'ml-0 pt-0'
             : sidebarCollapsed
-              ? 'ml-16 pt-24'
-              : 'ml-64 pt-24'
+              ? 'ml-16 pt-16'
+              : 'ml-64 pt-16'
             }`}
         >
           <div className="px-4 sm:px-6 lg:px-8 py-8">

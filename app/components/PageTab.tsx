@@ -239,6 +239,9 @@ export default function PageTab({
   const widthsRef = useRef({ workflow: workflowColumnWidths, progress: progressColumnWidths });
   widthsRef.current = { workflow: workflowColumnWidths, progress: progressColumnWidths };
 
+  // Track if component has mounted to prevent saving defaults on initial load
+  const hasMountedRef = useRef(false);
+
   // Load widths from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -263,16 +266,19 @@ export default function PageTab({
       if (savedWorkflowZoom) setWorkflowZoom(parseInt(savedWorkflowZoom));
       if (savedProgressZoom) setProgressZoom(parseInt(savedProgressZoom));
       if (savedCompactMode) setCompactMode(savedCompactMode === 'true');
+
+      // Mark as mounted after loading
+      hasMountedRef.current = true;
     }
   }, []);
 
-  // Save widths when resizing ends
+  // Save widths whenever they change (but not on initial mount)
   useEffect(() => {
-    if (!resizingColumn) {
-      localStorage.setItem(STORAGE_KEY_WORKFLOW_WIDTHS, JSON.stringify(widthsRef.current.workflow));
-      localStorage.setItem(STORAGE_KEY_PROGRESS_WIDTHS, JSON.stringify(widthsRef.current.progress));
+    if (typeof window !== 'undefined' && hasMountedRef.current) {
+      localStorage.setItem(STORAGE_KEY_WORKFLOW_WIDTHS, JSON.stringify(workflowColumnWidths));
+      localStorage.setItem(STORAGE_KEY_PROGRESS_WIDTHS, JSON.stringify(progressColumnWidths));
     }
-  }, [resizingColumn]);
+  }, [workflowColumnWidths, progressColumnWidths]);
 
   // Save view control settings
   useEffect(() => {

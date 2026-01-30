@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const pkrOpex = await prisma.pKROpex.findMany({
       orderBy: {
-        date: 'desc',
+        sortOrder: 'asc',
       },
     });
     return NextResponse.json(pkrOpex);
@@ -30,6 +30,7 @@ export async function POST(request: Request) {
         saldoPRK: data.saldoPRK ? parseFloat(data.saldoPRK) : null,
         evidence: data.evidence,
         pic: data.pic,
+        sortOrder: data.sortOrder !== undefined ? data.sortOrder : 0,
       },
     });
     return NextResponse.json(pkr);
@@ -53,6 +54,7 @@ export async function PUT(request: Request) {
         saldoPRK: data.saldoPRK ? parseFloat(data.saldoPRK) : null,
         evidence: data.evidence,
         pic: data.pic,
+        sortOrder: data.sortOrder !== undefined ? data.sortOrder : 0,
       },
     });
     return NextResponse.json(pkr);

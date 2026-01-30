@@ -248,6 +248,9 @@ export default function PKROpexTab({
   const widthsRef = useRef(columnWidths);
   widthsRef.current = columnWidths;
 
+  // Track if component has mounted
+  const hasMountedRef = useRef(false);
+
   // Load settings from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -263,15 +266,18 @@ export default function PKROpexTab({
       }
 
       if (savedZoom) setZoom(parseInt(savedZoom));
+
+      // Mark as mounted
+      hasMountedRef.current = true;
     }
   }, []);
 
-  // Save widths when resizing ends
+  // Save widths whenever they change (but not on initial mount)
   useEffect(() => {
-    if (!resizingColumn) {
-      localStorage.setItem(STORAGE_KEY_WIDTHS, JSON.stringify(widthsRef.current));
+    if (typeof window !== 'undefined' && hasMountedRef.current) {
+      localStorage.setItem(STORAGE_KEY_WIDTHS, JSON.stringify(columnWidths));
     }
-  }, [resizingColumn]);
+  }, [columnWidths]);
 
   // Save zoom
   useEffect(() => {
@@ -477,46 +483,52 @@ export default function PKROpexTab({
     setSaveStatus('saving');
     try {
       const updatedRows = [...rows];
-      let hasChanges = false;
-      let saveSuccess = false;
+      const dirtyRows = updatedRows
+        .map((row, index) => ({ row, index }))
+        .filter(({ row }) => row.isDirty);
 
-      for (let i = 0; i < updatedRows.length; i++) {
-        const row = updatedRows[i];
-        if (row.isDirty) {
-          hasChanges = true;
-          const method = row.isNew ? 'POST' : 'PUT';
-          const { isDirty, isNew, clientId, ...cleanRow } = row;
-          const body = { ...cleanRow, sortOrder: i };
+      if (dirtyRows.length === 0) {
+        setSaveStatus('saved');
+        return;
+      }
 
-          const res = await fetch('/api/pkr-opex', {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-          });
+      // Save all dirty rows in parallel for better performance
+      const savePromises = dirtyRows.map(async ({ row, index }) => {
+        const method = row.isNew ? 'POST' : 'PUT';
+        const { isDirty, isNew, clientId, ...cleanRow } = row;
+        const body = { ...cleanRow, sortOrder: index };
 
-          if (res.ok) {
-            const savedData = await res.json();
-            // Update local state with real ID and reset dirty flags
-            updatedRows[i] = {
-              ...updatedRows[i],
-              id: savedData.id || row.id,
-              sortOrder: i, // Ensure sortOrder is kept in sync logic
-              isDirty: false,
-              isNew: false
-            };
-            saveSuccess = true;
-          }
+        const res = await fetch('/api/pkr-opex', {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        if (res.ok) {
+          const savedData = await res.json();
+          return { index, savedData, success: true };
         }
-      }
+        return { index, success: false };
+      });
 
-      if (saveSuccess) {
-        setRows(updatedRows);
-        setSaveStatus('saved');
-      } else if (hasChanges) {
-        setSaveStatus('error');
-      } else {
-        setSaveStatus('saved');
-      }
+      const results = await Promise.all(savePromises);
+
+      // Update rows with saved data
+      results.forEach(result => {
+        if (result.success && result.savedData) {
+          updatedRows[result.index] = {
+            ...updatedRows[result.index],
+            id: result.savedData.id || updatedRows[result.index].id,
+            sortOrder: result.index,
+            isDirty: false,
+            isNew: false
+          };
+        }
+      });
+
+      const allSuccess = results.every(r => r.success);
+      setRows(updatedRows);
+      setSaveStatus(allSuccess ? 'saved' : 'error');
 
     } catch (error) {
       console.error('Error saving:', error);
@@ -537,7 +549,7 @@ export default function PKROpexTab({
 
       autoSaveTimerRef.current = setTimeout(() => {
         saveDirtyRows();
-      }, 2000);
+      }, 1000); // Reduced from 2000ms to 1000ms for faster auto-save
     } else {
       setSaveStatus('saved');
     }

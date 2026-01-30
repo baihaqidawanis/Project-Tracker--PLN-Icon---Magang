@@ -14,7 +14,7 @@ export async function GET() {
         latestActivityStatus: true,
       },
       orderBy: {
-        createdAt: 'desc',
+        sortOrder: 'asc',
       },
     });
     return NextResponse.json(projects);
@@ -26,14 +26,29 @@ export async function GET() {
 // POST new project
 export async function POST(request: Request) {
   try {
-    const data = await request.json();
+    let data;
+    try {
+      const text = await request.text();
+      if (!text) {
+        return NextResponse.json({ error: 'Empty body' }, { status: 400 });
+      }
+      data = JSON.parse(text);
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const parseId = (val: any) => {
+      const parsed = parseInt(val);
+      return isNaN(parsed) || parsed === 0 ? null : parsed;
+    };
+
     const project = await prisma.project.create({
       data: {
         code: data.code,
-        branchId: parseInt(data.branchId),
+        branchId: parseId(data.branchId),
         namaCalonMitra: data.namaCalonMitra,
-        prioritasId: parseInt(data.prioritasId),
-        picId: parseInt(data.picId),
+        prioritasId: parseId(data.prioritasId),
+        picId: parseId(data.picId),
         jenisKerjaSama: data.jenisKerjaSama,
         progressPercentage: parseInt(data.progressPercentage) || 0,
         latestUpdate: data.latestUpdate,
@@ -41,7 +56,7 @@ export async function POST(request: Request) {
         targetDate: data.targetDate ? new Date(data.targetDate) : null,
         linkDokumen: data.linkDokumen,
         latestActivity: data.latestActivity,
-        latestActivityStatusId: data.latestActivityStatusId ? parseInt(data.latestActivityStatusId) : null,
+        latestActivityStatusId: parseId(data.latestActivityStatusId),
       },
       include: {
         branch: true,

@@ -5,18 +5,23 @@ const prisma = new PrismaClient();
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await props.params;
+    const id = parseInt(params.id);
+
+    if (isNaN(id)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+    }
+
     const project = await prisma.project.findUnique({
-      where: { id: parseInt(params.id) },
+      where: { id },
       include: {
         branch: true,
         prioritas: true,
         pic: true,
         latestActivityStatus: true,
-        workflows: true,
-        dailyProgress: true,
       },
     });
     if (!project) {
@@ -30,27 +35,62 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
-    const data = await request.json();
+    const params = await props.params;
+    const id = parseInt(params.id);
+
+    if (isNaN(id)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+    }
+
+    let data;
+    try {
+      const text = await request.text();
+      if (!text) {
+        return NextResponse.json({ error: 'Empty body' }, { status: 400 });
+      }
+      data = JSON.parse(text);
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    // Helper to safely parse numbers that might be 0/null
+    const parseId = (val: any) => {
+      const parsed = parseInt(val);
+      return isNaN(parsed) || parsed === 0 ? null : parsed;
+    };
+
+    // Prepare update data
+    const updateData: any = {
+      code: data.code,
+      branchId: parseId(data.branchId),
+      namaCalonMitra: data.namaCalonMitra,
+      prioritasId: parseId(data.prioritasId),
+      picId: parseId(data.picId),
+      jenisKerjaSama: data.jenisKerjaSama,
+      progressPercentage: parseInt(data.progressPercentage),
+      latestUpdate: data.latestUpdate,
+      actionPlan: data.actionPlan,
+      targetDate: data.targetDate ? new Date(data.targetDate) : null,
+      linkDokumen: data.linkDokumen,
+      latestActivity: data.latestActivity,
+      latestActivityStatusId: parseId(data.latestActivityStatusId),
+    };
+
+    // Try to add sortOrder if supported
+    if (data.sortOrder !== undefined) {
+      try {
+        updateData.sortOrder = data.sortOrder;
+      } catch (e) {
+        console.warn('sortOrder field not yet supported, skipping');
+      }
+    }
+
     const project = await prisma.project.update({
-      where: { id: parseInt(params.id) },
-      data: {
-        code: data.code,
-        branchId: parseInt(data.branchId),
-        namaCalonMitra: data.namaCalonMitra,
-        prioritasId: parseInt(data.prioritasId),
-        picId: parseInt(data.picId),
-        jenisKerjaSama: data.jenisKerjaSama,
-        progressPercentage: parseInt(data.progressPercentage),
-        latestUpdate: data.latestUpdate,
-        actionPlan: data.actionPlan,
-        targetDate: data.targetDate ? new Date(data.targetDate) : null,
-        linkDokumen: data.linkDokumen,
-        latestActivity: data.latestActivity,
-        latestActivityStatusId: data.latestActivityStatusId ? parseInt(data.latestActivityStatusId) : null,
-      },
+      where: { id },
+      data: updateData,
       include: {
         branch: true,
         prioritas: true,
@@ -59,19 +99,30 @@ export async function PUT(
       },
     });
     return NextResponse.json(project);
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
+  } catch (error: any) {
+    console.error('Error updating project:', error);
+    if (error.stack) console.error('Error stack:', error.stack);
+    return NextResponse.json({
+      error: 'Failed to update project',
+      details: error.message
+    }, { status: 500 });
   }
 }
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await props.params;
+    const id = parseInt(params.id);
+
+    if (isNaN(id)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+    }
+
     await prisma.project.delete({
-      where: { id: parseInt(params.id) },
+      where: { id },
     });
     return NextResponse.json({ message: 'Project deleted successfully' });
   } catch (error) {
