@@ -242,154 +242,97 @@ export default function PartnershipTab({
   // ===== AUTO-CALCULATION FUNCTIONS =====
 
   // Calculate % Progress from workflows
+  // Calculate % Progress: Sum of all SUB workflow progress / 2
   const calculateProgress = (code: string): number => {
     if (!code || !pages || !workflows) return 0;
-
     const page = pages.find(p => p.pageNumber === code);
     if (!page) return 0;
 
-    const pageWorkflows = workflows.filter(w => w.pageId === page.id);
+    const pageWorkflows = workflows.filter(w => w.pageId === page.id && w.type === 'sub');
     if (pageWorkflows.length === 0) return 0;
 
     const totalProgress = pageWorkflows.reduce((sum, w) => sum + (w.progress || 0), 0);
-    return Math.round(totalProgress / 2); // Sum all then divide by 2 as requested
+    // User requested "sum entire column progress... or sum all then / 2". 
+    // Implementing sum all then / 2.
+    return Math.round(totalProgress / 2);
   };
 
-  // Get latest date updated from daily progress (category = "Update")
-  const getLatestDateUpdated = (code: string): string => {
-    if (!code || !pages || !dailyProgress) return '';
-
-    const page = pages.find(p => p.pageNumber === code);
-    if (!page) return '';
-
-    const pageProgress = dailyProgress
-      .filter(dp => dp.pageId === page.id && dp.category?.toLowerCase() === 'update')
-      .sort((a, b) => {
-        if (!a.date) return 1;
-        if (!b.date) return -1;
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-      });
-
-    if (pageProgress.length === 0) return '';
-    return pageProgress[0].date ? formatDateForInput(pageProgress[0].date) : '';
+  // Helper to categorize daily progress
+  const getCategory = (activityType: string) => {
+    if (!activityType) return '';
+    if (activityType === 'Meeting Update' || activityType === 'Action Update') return 'Update';
+    return 'Plan';
   };
 
-  // Get latest update description from daily progress (category = "Update")
-  const getLatestUpdate = (code: string): string => {
-    if (!code || !pages || !dailyProgress) return '';
-
+  // Latest Date Updated & Latest Update (Category = Update)
+  const getLatestUpdateData = (code: string) => {
+    if (!code || !pages || !dailyProgress) return { date: '', description: '' };
     const page = pages.find(p => p.pageNumber === code);
-    if (!page) return '';
+    if (!page) return { date: '', description: '' };
 
-    const pageProgress = dailyProgress
-      .filter(dp => dp.pageId === page.id && dp.category?.toLowerCase() === 'update')
-      .sort((a, b) => {
-        if (!a.date) return 1;
-        if (!b.date) return -1;
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-      });
+    const updates = dailyProgress
+      .filter(dp => dp.pageId === page.id && getCategory(dp.activityType) === 'Update')
+      // Sort by date descending
+      .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
-    if (pageProgress.length === 0) return '';
-    return pageProgress[0].description || '';
+    if (updates.length === 0) return { date: '', description: '' };
+    return {
+      date: updates[0].date ? formatDateForInput(updates[0].date) : '',
+      description: updates[0].description || ''
+    };
   };
 
-  // Get action plan from daily progress (category = "Plan")
-  const getActionPlan = (code: string): string => {
-    if (!code || !pages || !dailyProgress) return '';
-
+  // Action Plan & Target (Category = Plan)
+  const getPlanData = (code: string) => {
+    if (!code || !pages || !dailyProgress) return { actionPlan: '', target: '' };
     const page = pages.find(p => p.pageNumber === code);
-    if (!page) return '';
+    if (!page) return { actionPlan: '', target: '' };
 
-    const pageProgress = dailyProgress
-      .filter(dp => dp.pageId === page.id && dp.category?.toLowerCase() === 'plan')
-      .sort((a, b) => {
-        if (!a.date) return 1;
-        if (!b.date) return -1;
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-      });
+    const plans = dailyProgress
+      .filter(dp => dp.pageId === page.id && getCategory(dp.activityType) === 'Plan')
+      // Sort by date descending (latest Plan)
+      .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
-    if (pageProgress.length === 0) return '';
-    return pageProgress[0].description || '';
+    if (plans.length === 0) return { actionPlan: '', target: '' };
+    return {
+      actionPlan: plans[0].description || '',
+      target: plans[0].targetIfPlan || ''
+    };
   };
 
-  // Get target date from daily progress (category = "Plan")
-  const getTargetDate = (code: string): string => {
-    if (!code || !pages || !dailyProgress) return '';
-
+  // Latest Activity & Status (Hierarchy: On Progress > Not Started > Done, Bottom-up)
+  const getActivityData = (code: string) => {
+    if (!code || !pages || !workflows) return { activity: '', statusId: '' };
     const page = pages.find(p => p.pageNumber === code);
-    if (!page) return '';
+    if (!page) return { activity: '', statusId: '' };
 
-    const pageProgress = dailyProgress
-      .filter(dp => dp.pageId === page.id && dp.category?.toLowerCase() === 'plan')
-      .sort((a, b) => {
-        if (!a.date) return 1;
-        if (!b.date) return -1;
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-      });
-
-    if (pageProgress.length === 0) return '';
-    return pageProgress[0].targetIfPlan || '';
-  };
-
-  // Get latest activity from workflows (hierarchical: On Progress -> Not Started -> Done, search bottom-to-top)
-  const getLatestActivity = (code: string): string => {
-    if (!code || !pages || !workflows) return '';
-
-    const page = pages.find(p => p.pageNumber === code);
-    if (!page) return '';
-
+    // Get workflows for this page, sort by sortOrder descending (bottom-up)
     const pageWorkflows = workflows
       .filter(w => w.pageId === page.id)
-      .sort((a, b) => (b.sortOrder || 0) - (a.sortOrder || 0)); // Bottom to top
+      .sort((a, b) => (b.sortOrder || 0) - (a.sortOrder || 0));
 
-    // Search for "On Progress" first
-    const onProgress = pageWorkflows.find(w => w.status?.toLowerCase() === 'on progress');
-    if (onProgress) return onProgress.activity || '';
-
-    // Then "Not Started"
-    const notStarted = pageWorkflows.find(w => w.status?.toLowerCase() === 'not started');
-    if (notStarted) return notStarted.activity || '';
-
-    // Finally "Done"
-    const done = pageWorkflows.find(w => w.status?.toLowerCase() === 'done');
-    if (done) return done.activity || '';
-
-    return '';
-  };
-
-  // Get latest activity status from workflows (same logic as getLatestActivity)
-  const getLatestActivityStatus = (code: string): string => {
-    if (!code || !pages || !workflows || !masterData?.statuses) return '';
-
-    const page = pages.find(p => p.pageNumber === code);
-    if (!page) return '';
-
-    const pageWorkflows = workflows
-      .filter(w => w.pageId === page.id)
-      .sort((a, b) => (b.sortOrder || 0) - (a.sortOrder || 0)); // Bottom to top
-
-    // Search for "On Progress" first
+    // 1. Find "On Progress"
     const onProgress = pageWorkflows.find(w => w.status?.toLowerCase() === 'on progress');
     if (onProgress) {
-      const statusObj = masterData.statuses?.find((s: any) => s.name?.toLowerCase() === 'on progress');
-      return statusObj?.id?.toString() || '';
+      const statusId = masterData?.statuses?.find((s: any) => s.name?.toLowerCase() === 'on progress')?.id;
+      return { activity: onProgress.activity, statusId: statusId || '' };
     }
 
-    // Then "Not Started"
+    // 2. Find "Not Started"
     const notStarted = pageWorkflows.find(w => w.status?.toLowerCase() === 'not started');
     if (notStarted) {
-      const statusObj = masterData.statuses?.find((s: any) => s.name?.toLowerCase() === 'not started');
-      return statusObj?.id?.toString() || '';
+      const statusId = masterData?.statuses?.find((s: any) => s.name?.toLowerCase() === 'not started')?.id;
+      return { activity: notStarted.activity, statusId: statusId || '' };
     }
 
-    // Finally "Done"
+    // 3. Find "Done"
     const done = pageWorkflows.find(w => w.status?.toLowerCase() === 'done');
     if (done) {
-      const statusObj = masterData.statuses?.find((s: any) => s.name?.toLowerCase() === 'done');
-      return statusObj?.id?.toString() || '';
+      const statusId = masterData?.statuses?.find((s: any) => s.name?.toLowerCase() === 'done')?.id;
+      return { activity: done.activity, statusId: statusId || '' };
     }
 
-    return '';
+    return { activity: '', statusId: '' };
   };
 
   // Load data into editable state with auto-calculations
@@ -401,25 +344,31 @@ export default function PartnershipTab({
 
     const partnershipRows = projects.map((p, index) => {
       const code = p.code || '';
+      const updateData = getLatestUpdateData(code);
+      const planData = getPlanData(code);
+      const activityData = getActivityData(code);
 
       return {
         ...p,
         clientId: p.id ? p.id.toString() : `temp-${index}`,
         code: code,
+        // Ensure dropdown values are IDs or strings as needed
         branchId: p.branchId || '',
         prioritasId: p.prioritasId || '',
         picId: p.picId || '',
-        // Auto-calculate fields
+
+        // Auto-calculated fields
         progressPercentage: calculateProgress(code),
-        latestDateUpdated: getLatestDateUpdated(code),
-        latestUpdate: getLatestUpdate(code),
-        actionPlan: getActionPlan(code),
-        targetDate: getTargetDate(code),
-        latestActivity: getLatestActivity(code),
-        latestActivityStatusId: getLatestActivityStatus(code),
+        latestDateUpdated: updateData.date,
+        latestUpdate: updateData.description,
+        actionPlan: planData.actionPlan,
+        targetDate: planData.target,
+        latestActivity: activityData.activity,
+        latestActivityStatusId: activityData.statusId,
+
         // Other fields
         kode: p.kode || '',
-        namaCalonMitra: p.namaCalonMitra || '',
+        namaCalonMitra: p.namaCalonMitra || '', // Auto from Page ideally, but here we read from DB or sync
         jenisKerjaSama: p.jenisKerjaSama || '',
         linkDokumen: p.linkDokumen || '',
         sortOrder: p.sortOrder !== undefined ? p.sortOrder : index,
@@ -975,26 +924,9 @@ export default function PartnershipTab({
                     ) : (
                       filteredRows.map((row, idx) => (
                         <SortableRow key={row.clientId} id={row.clientId} className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${row.isDirty ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}`}>
-                          {/* Code */}
+                          {/* Code (Read-Only) */}
                           <td className="px-2 py-1" style={{ width: columnWidths.code }}>
-                            <div className={`relative ${isCellInSelection(idx, 'code') ? 'ring-2 ring-blue-500' : ''}`}
-                              onMouseEnter={() => handleFillMouseEnter(idx, 'code')}>
-                              <input
-                                type="text"
-                                value={row.code}
-                                onChange={(e) => updateCell(idx, 'code', e.target.value)}
-                                onFocus={() => handleCellFocus(idx, 'code')}
-                                onPaste={(e) => handlePaste(e, idx, 0)}
-                                className="w-full px-2 py-1 text-sm bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100"
-                                placeholder="Code..."
-                              />
-                              {isCellActive(idx, 'code') && (
-                                <div
-                                  className="absolute bottom-0 right-0 w-2 h-2 bg-blue-600 cursor-crosshair"
-                                  onMouseDown={(e) => handleFillMouseDown(e, idx)}
-                                />
-                              )}
-                            </div>
+                            <div className="w-full px-2 py-1 text-xs text-gray-700 dark:text-gray-300">{row.code}</div>
                           </td>
 
                           {/* Kode - Dropdown */}
@@ -1025,26 +957,9 @@ export default function PartnershipTab({
                             </select>
                           </td>
 
-                          {/* Nama Calon Mitra */}
+                          {/* Nama Calon Mitra (Read-Only) */}
                           <td className="px-2 py-1" style={{ width: columnWidths.namaCalonMitra }}>
-                            <div className={`relative ${isCellInSelection(idx, 'namaCalonMitra') ? 'ring-2 ring-blue-500' : ''}`}
-                              onMouseEnter={() => handleFillMouseEnter(idx, 'namaCalonMitra')}>
-                              <textarea
-                                value={row.namaCalonMitra}
-                                onChange={(e) => updateCell(idx, 'namaCalonMitra', e.target.value)}
-                                onFocus={() => handleCellFocus(idx, 'namaCalonMitra')}
-                                onPaste={(e) => handlePaste(e, idx, 3)}
-                                onInput={autoResize}
-                                className="w-full px-2 py-1 text-sm bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100 resize-none overflow-hidden"
-                                rows={1}
-                              />
-                              {isCellActive(idx, 'namaCalonMitra') && (
-                                <div
-                                  className="absolute bottom-0 right-0 w-2 h-2 bg-blue-600 cursor-crosshair"
-                                  onMouseDown={(e) => handleFillMouseDown(e, idx)}
-                                />
-                              )}
-                            </div>
+                            <div className="w-full px-2 py-1 text-xs text-gray-700 dark:text-gray-300 truncate" title={row.namaCalonMitra}>{row.namaCalonMitra}</div>
                           </td>
 
                           {/* Prioritas - Dropdown */}

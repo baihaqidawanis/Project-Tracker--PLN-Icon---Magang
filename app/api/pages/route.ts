@@ -72,10 +72,33 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const data = await request.json();
-    console.log('[API PUT] Received data:', data);
 
+    // Get ID from body or query params
+    let id = data.id;
+    if (!id) {
+      const { searchParams } = new URL(request.url);
+      const queryId = searchParams.get('id');
+      if (queryId) id = parseInt(queryId);
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+    }
+
+    // 1. Fetch existing page to get old values
+    const existingPage = await prisma.page.findUnique({
+      where: { id: parseInt(id) },
+    });
+
+    if (!existingPage) {
+      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+    }
+
+    const oldPageNumber = existingPage.pageNumber;
+
+    // 2. Update the page
     const page = await prisma.page.update({
-      where: { id: parseInt(data.id) },
+      where: { id: parseInt(id) },
       data: {
         pageNumber: data.pageNumber,
         partnershipName: data.partnershipName,
@@ -84,25 +107,26 @@ export async function PUT(request: Request) {
 
     console.log('[API PUT] Updated page:', page);
 
-    // Update corresponding Partnership (Project) row if it exists
+    // 3. Update corresponding Partnership (Project) row using OLD page number
     try {
       const existingProject = await prisma.project.findFirst({
-        where: { code: data.pageNumber },
+        where: { code: oldPageNumber }, // Use OLD code to find the project
       });
 
       if (existingProject) {
         await prisma.project.update({
           where: { id: existingProject.id },
           data: {
-            code: data.pageNumber,
-            namaCalonMitra: data.partnershipName,
+            code: data.pageNumber, // Update to NEW code
+            namaCalonMitra: data.partnershipName, // Update name
           },
         });
-        console.log('[API PUT] Updated corresponding Partnership row');
+        console.log('[API PUT] Synced Partnership row from', oldPageNumber, 'to', data.pageNumber);
+      } else {
+        console.warn('[API PUT] No corresponding Partnership found for code:', oldPageNumber);
       }
     } catch (projectError) {
       console.error('[API PUT] Failed to update Partnership row:', projectError);
-      // Don't fail the entire request if Partnership update fails
     }
 
     return NextResponse.json(page);
