@@ -379,7 +379,17 @@ export default function PKROpexTab({
       isDirty: false,
       isNew: false,
     }));
-    setRows(opexRows);
+
+    // Sort by sortOrder if available (preserves user's manual order)
+    // Otherwise keep original order from backend
+    const sortedRows = opexRows.sort((a, b) => {
+      if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+        return a.sortOrder - b.sortOrder;
+      }
+      return 0; // Keep original order if no sortOrder
+    });
+
+    setRows(sortedRows);
   }, [pkrOpex]);
 
   const updateCell = (index: number, field: keyof PKROpexRow, value: any) => {
@@ -393,17 +403,19 @@ export default function PKROpexTab({
   const addRow = () => {
     const newRow: PKROpexRow = {
       clientId: `new-${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
+      date: '',
       mitra: '',
       description: '',
       saldoTopUp: '',
       saldoPRK: '',
       evidence: '',
       pic: '',
+      sortOrder: -1, // New rows at top
       isNew: true,
       isDirty: true,
     };
-    setRows(prev => [...prev, newRow]);
+    // Add new row at the beginning (index 0)
+    setRows(prev => [newRow, ...prev].map((row, index) => ({ ...row, sortOrder: index })));
   };
 
   const deleteRow = async (index: number) => {

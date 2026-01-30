@@ -557,43 +557,37 @@ export default function PageTab({
     })
   );
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  // Separate drag handlers for Workflow and Progress
+  const handleWorkflowDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    // Check if the item belongs to workflowRows
-    // We can't rely on state directly if it's stale, but in this component render cycle it should be fine.
-    // To be safer, we can check if the active.id starts with specific prefix or just search in both.
+    setWorkflowRows((items) => {
+      const oldIndex = items.findIndex((item) => item.clientId === active.id);
+      const newIndex = items.findIndex((item) => item.clientId === over.id);
 
-    // Attempt to find in workflows first (since we can access state here)
-    // Note: This relies on workflowRows being up to date in the closure. 
-    // Since this is a functional component re-rendering on state change, it should be fine.
-    const isWorkflow = workflowRows.some(row => row.clientId === active.id);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newRows = arrayMove(items, oldIndex, newIndex);
+        return newRows.map((row, index) => ({ ...row, isDirty: true, sortOrder: index }));
+      }
+      return items;
+    });
+  };
 
-    if (isWorkflow) {
-      setWorkflowRows((items) => {
-        const oldIndex = items.findIndex((item) => item.clientId === active.id);
-        const newIndex = items.findIndex((item) => item.clientId === over.id);
+  const handleProgressDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-        if (oldIndex !== -1 && newIndex !== -1) {
-          const newRows = arrayMove(items, oldIndex, newIndex);
-          return newRows.map((row, index) => ({ ...row, isDirty: true, sortOrder: index }));
-        }
-        return items;
-      });
-    } else {
-      // Assume Progress
-      setProgressRows((items) => {
-        const oldIndex = items.findIndex((item) => item.clientId === active.id);
-        const newIndex = items.findIndex((item) => item.clientId === over.id);
+    setProgressRows((items) => {
+      const oldIndex = items.findIndex((item) => item.clientId === active.id);
+      const newIndex = items.findIndex((item) => item.clientId === over.id);
 
-        if (oldIndex !== -1 && newIndex !== -1) {
-          const newRows = arrayMove(items, oldIndex, newIndex);
-          return newRows.map((row, index) => ({ ...row, isDirty: true, sortOrder: index }));
-        }
-        return items;
-      });
-    }
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newRows = arrayMove(items, oldIndex, newIndex);
+        return newRows.map((row, index) => ({ ...row, isDirty: true, sortOrder: index }));
+      }
+      return items;
+    });
   };
 
   // --- AUTO SAVE LOGIC ---
@@ -813,10 +807,12 @@ export default function PageTab({
       targetIfPlan: '',
       pic: '',
       category: '',
+      sortOrder: -1, // New rows at top
       isNew: true,
       isDirty: true
     };
-    setProgressRows(prev => [...prev, newRow]);
+    // Add new row at the beginning (index 0)
+    setProgressRows(prev => [newRow, ...prev].map((row, index) => ({ ...row, sortOrder: index })));
   };
 
   const deleteProgressRow = async (index: number) => {
@@ -1105,7 +1101,7 @@ export default function PageTab({
                       <DndContext
                         sensors={sensors}
                         collisionDetection={closestCenter}
-                        onDragEnd={handleDragEnd}
+                        onDragEnd={handleWorkflowDragEnd}
                       >
                         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                           <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
@@ -1359,7 +1355,7 @@ export default function PageTab({
                       <DndContext
                         sensors={sensors}
                         collisionDetection={closestCenter}
-                        onDragEnd={handleDragEnd}
+                        onDragEnd={handleProgressDragEnd}
                       >
                         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                           <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
