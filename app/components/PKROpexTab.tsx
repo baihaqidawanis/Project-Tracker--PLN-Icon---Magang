@@ -38,6 +38,7 @@ interface PKROpexRow {
 
 interface PKROpexTabProps {
   pkrOpex: any[];
+  setPkrOpex: React.Dispatch<React.SetStateAction<any[]>>;
   loading: boolean;
   onOpenModal: (type: string, item?: any) => void;
   onDelete: (type: string, id: number) => void;
@@ -150,6 +151,7 @@ function DateDisplayInput({ value, onChange, onFocus, onPaste, className, style 
 
 export default function PKROpexTab({
   pkrOpex,
+  setPkrOpex,
   loading,
   onOpenModal,
   onDelete,
@@ -159,6 +161,13 @@ export default function PKROpexTab({
 
   const [rows, setRows] = useState<PKROpexRow[]>([]);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+
+  // Ref for save-on-unmount
+  const rowsRef = useRef(rows);
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
+
   const [zoom, setZoom] = useState(100);
 
   const [activeCell, setActiveCell] = useState<{ rowIndex: number; field: string } | null>(null);
@@ -528,6 +537,7 @@ export default function PKROpexTab({
 
       const allSuccess = results.every(r => r.success);
       setRows(updatedRows);
+
       setSaveStatus(allSuccess ? 'saved' : 'error');
 
     } catch (error) {
@@ -560,6 +570,30 @@ export default function PKROpexTab({
       }
     };
   }, [rows]);
+
+  // Save on Unmount Effect - only save to DB
+  useEffect(() => {
+    return () => {
+      const currentRows = rowsRef.current;
+      const dirtyRows = currentRows.filter(r => r.isDirty);
+
+      // Save any remaining dirty data to DB
+      if (dirtyRows.length > 0) {
+        dirtyRows.forEach(row => {
+          const method = row.isNew ? 'POST' : 'PUT';
+          const { isDirty, isNew, clientId, ...cleanRow } = row;
+          const body = { ...cleanRow, sortOrder: row.sortOrder ?? 0 };
+
+          fetch('/api/pkr-opex', {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            keepalive: true
+          }).catch(err => console.error('Unmount save failed', err));
+        });
+      }
+    };
+  }, []);
 
   const formatCurrency = (value: string) => {
     if (!value) return '';

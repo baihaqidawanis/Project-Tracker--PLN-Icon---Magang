@@ -97,6 +97,35 @@ export default function ProjectTracker() {
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
 
+  // Re-fetch PKR Opex data when switching to pkr-opex tab to get latest changes
+  useEffect(() => {
+    if (activeTab === 'pkr-opex') {
+      const refetchPkrOpex = async () => {
+        try {
+          const res = await fetch('/api/pkr-opex');
+          const data = await res.json();
+          setPkrOpex(data);
+        } catch (error) {
+          console.error('Error re-fetching PKR Opex:', error);
+        }
+      };
+      refetchPkrOpex();
+    }
+    // Re-fetch Partnership data when switching to partnership tab
+    if (activeTab === 'partnership') {
+      const refetchPartnership = async () => {
+        try {
+          const res = await fetch('/api/projects');
+          const data = await res.json();
+          setProjects(data);
+        } catch (error) {
+          console.error('Error re-fetching Partnership:', error);
+        }
+      };
+      refetchPartnership();
+    }
+  }, [activeTab]);
+
   // Fetch all data on mount
   useEffect(() => {
     fetchAllData();
@@ -232,6 +261,21 @@ export default function ProjectTracker() {
     }
   };
 
+  // Sync handler for PageTab unmount - updates parent state with latest child data
+  const handlePageTabSync = (pageId: number, workflowsData: any[], progressData: any[]) => {
+    // Update workflows: remove old data for this page and add fresh data
+    setWorkflows(prev => {
+      const otherPages = prev.filter(w => w.pageId !== pageId);
+      return [...otherPages, ...workflowsData.map(w => ({ ...w, pageId }))];
+    });
+
+    // Update daily progress: remove old data for this page and add fresh data
+    setDailyProgress(prev => {
+      const otherPages = prev.filter(dp => dp.pageId !== pageId);
+      return [...otherPages, ...progressData.map(p => ({ ...p, pageId }))];
+    });
+  };
+
   // FIXED: Check if we should hide header/sidebar based on fullScreenMode
   const shouldHideNavigation = fullScreenMode !== 'none';
 
@@ -285,6 +329,7 @@ export default function ProjectTracker() {
                 {activeTab === 'partnership' && (
                   <PartnershipTab
                     projects={projects}
+                    setProjects={setProjects}
                     masterData={masterData}
                     loading={loading}
                     onOpenModal={openModal}
@@ -308,6 +353,7 @@ export default function ProjectTracker() {
                     setFullScreenMode={setFullScreenMode}
                     onOpenModal={openModal}
                     onDelete={handleDelete}
+                    onSyncBeforeUnmount={handlePageTabSync}
                   />
                 )}
 
@@ -318,6 +364,7 @@ export default function ProjectTracker() {
                 {activeTab === 'pkr-opex' && (
                   <PKROpexTab
                     pkrOpex={pkrOpex}
+                    setPkrOpex={setPkrOpex}
                     loading={loading}
                     onOpenModal={openModal}
                     onDelete={handleDelete}

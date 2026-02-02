@@ -124,6 +124,7 @@ type PageTabProps = {
   setFullScreenMode: React.Dispatch<React.SetStateAction<FullScreenMode>>;
   onOpenModal: (type: string, data?: any) => void;
   onDelete: (type: string, id: number) => Promise<void>;
+  onSyncBeforeUnmount?: (pageId: number, workflows: any[], progress: any[]) => void;
 };
 
 // DateDisplayInput Component - shows "dd MMM" when not focused, date picker when focused
@@ -185,7 +186,8 @@ export default function PageTab({
   fullScreenMode,
   setFullScreenMode,
   onOpenModal,
-  onDelete
+  onDelete,
+  onSyncBeforeUnmount
 }: PageTabProps) {
   // Constants for localStorage
   const STORAGE_KEY_WORKFLOW_WIDTHS = 'pln_project_tracker_workflow_widths';
@@ -205,6 +207,23 @@ export default function PageTab({
   // Auto-Save States
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Refs for save-on-unmount
+  const workflowRowsRef = useRef(workflowRows);
+  const progressRowsRef = useRef(progressRows);
+  const selectedPageIdRef = useRef(selectedPageId);
+
+  useEffect(() => {
+    workflowRowsRef.current = workflowRows;
+  }, [workflowRows]);
+
+  useEffect(() => {
+    progressRowsRef.current = progressRows;
+  }, [progressRows]);
+
+  useEffect(() => {
+    selectedPageIdRef.current = selectedPageId;
+  }, [selectedPageId]);
 
   // --- FILL HANDLE STATES ---
   const [activeCell, setActiveCell] = useState<{ rowIndex: number; field: string; table: 'workflow' | 'progress' } | null>(null);
@@ -666,19 +685,9 @@ export default function PageTab({
 
       if (workflowChanges) {
         setWorkflowRows(updatedWorkflows);
-        // Sync to parent Workflows state
-        setWorkflows(prev => [
-          ...prev.filter(w => w.pageId !== selectedPageId),
-          ...updatedWorkflows
-        ]);
       }
       if (progressChanges) {
         setProgressRows(updatedProgress);
-        // Sync to parent DailyProgress state
-        setDailyProgress(prev => [
-          ...prev.filter(p => p.pageId !== selectedPageId),
-          ...updatedProgress
-        ]);
       }
 
       setSaveStatus('saved');
@@ -710,6 +719,58 @@ export default function PageTab({
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
   }, [workflowRows, progressRows]);
+
+  // Save on Unmount Effect
+  useEffect(() => {
+    return () => {
+      const pageId = selectedPageIdRef.current;
+      if (!pageId) return;
+
+      const workflows = workflowRowsRef.current;
+      const progress = progressRowsRef.current;
+
+      const dirtyWorkflows = workflows.filter(r => r.isDirty);
+      const dirtyProgress = progress.filter(r => r.isDirty);
+
+      // Save any remaining dirty data to DB
+      if (dirtyWorkflows.length > 0 || dirtyProgress.length > 0) {
+        // Save Workflows
+        dirtyWorkflows.forEach(row => {
+          const method = row.isNew ? 'POST' : 'PUT';
+          const { isNew, isDirty, type, clientId, ...rowPayload } = row;
+          const body = { ...rowPayload, pageId: pageId, sortOrder: row.sortOrder ?? 0 };
+
+          // Use keepalive for reliability during unload behavior
+          fetch('/api/workflows', {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            keepalive: true
+          }).catch(err => console.error('Unmount save failed', err));
+        });
+
+        // Save Progress
+        dirtyProgress.forEach(row => {
+          const method = row.isNew ? 'POST' : 'PUT';
+          const { isNew, isDirty, clientId, ...rowPayload } = row;
+          const body = { ...rowPayload, pageId: pageId, sortOrder: row.sortOrder ?? 0 };
+
+          fetch('/api/daily-progress', {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            keepalive: true
+          }).catch(err => console.error('Unmount save failed', err));
+        });
+      }
+
+      // ALWAYS sync current state to parent on unmount, regardless of dirty status
+      // This ensures parent has the latest data even if auto-save already cleared isDirty flags
+      if (onSyncBeforeUnmount) {
+        onSyncBeforeUnmount(pageId, workflows, progress);
+      }
+    };
+  }, [onSyncBeforeUnmount]);
 
 
   // --- WORKFLOW HANDLERS ---
@@ -911,38 +972,39 @@ export default function PageTab({
 
   const selectedPage = Array.isArray(pages) ? pages.find(p => p.id === selectedPageId) : undefined;
 
+  // Load workflows and progress from props (not from selectedPage) to ensure we get latest synced data
   useEffect(() => {
-    if (selectedPage) {
-      // Load workflows tanpa auto-fix (untuk menghindari infinite loop)
-      const workflows = selectedPage.workflows?.map((w: any, index: number) => {
-        return {
+    if (selectedPageId) {
+      // Load workflows from props filtered by selectedPageId
+      const pageWorkflows = workflows
+        .filter(w => w.pageId === selectedPageId)
+        .map((w: any, index: number) => ({
           ...w,
           clientId: w.id ? w.id.toString() : `temp-${index}`,
           type: w.no ? 'main' : 'sub',
-          isDirty: false, // Jangan auto-fix
+          isDirty: false,
           isNew: false
-        };
-      }) || [];
+        }));
 
-      setWorkflowRows(workflows);
+      setWorkflowRows(pageWorkflows);
 
-      // Load daily progress tanpa auto-fix
-      const progress = selectedPage.dailyProgress?.map((p: any, index: number) => {
-        return {
+      // Load daily progress from props filtered by selectedPageId
+      const pageProgress = dailyProgress
+        .filter(p => p.pageId === selectedPageId)
+        .map((p: any, index: number) => ({
           ...p,
           clientId: p.id ? p.id.toString() : `temp-${index}`,
           date: p.date || '',
-          isDirty: false, // Jangan auto-fix
+          isDirty: false,
           isNew: false
-        };
-      }) || [];
+        }));
 
-      setProgressRows(progress);
+      setProgressRows(pageProgress);
     } else {
       setWorkflowRows([]);
       setProgressRows([]);
     }
-  }, [selectedPage]);
+  }, [selectedPageId, workflows, dailyProgress]);
 
   const autoResize = (e: React.FormEvent<HTMLTextAreaElement>) => {
     e.currentTarget.style.height = 'auto';

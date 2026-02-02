@@ -72,6 +72,7 @@ interface PartnershipRow {
 
 interface PartnershipTabProps {
   projects: any[];
+  setProjects: React.Dispatch<React.SetStateAction<any[]>>;
   masterData: any;
   loading: boolean;
   onOpenModal: (type: string, item?: any) => void;
@@ -140,6 +141,7 @@ function ResizeHandle({ column, onResizeStart }: ResizeHandleProps) {
 
 export default function PartnershipTab({
   projects,
+  setProjects,
   masterData,
   loading,
   onOpenModal,
@@ -155,6 +157,12 @@ export default function PartnershipTab({
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Ref for save-on-unmount
+  const rowsRef = useRef(rows);
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
   const [searchTerm, setSearchTerm] = useState('');
   const [zoom, setZoom] = useState(100);
   const [zoomInput, setZoomInput] = useState('100');
@@ -480,12 +488,52 @@ export default function PartnershipTab({
         saveDirtyRows();
       }, 1000);
     }
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-    };
   }, [rows]);
+
+  // Save on Unmount Effect
+  useEffect(() => {
+    return () => {
+      const currentRows = rowsRef.current;
+      const dirtyRows = currentRows.filter(r => r.isDirty);
+
+      if (dirtyRows.length === 0) return;
+
+      dirtyRows.forEach(row => {
+        const method = row.isNew ? 'POST' : 'PUT';
+        const url = row.isNew ? '/api/projects' : `/api/projects/${row.id}`;
+
+        const branchId = typeof row.branchId === 'object' && row.branchId !== null ? (row.branchId as any).id : row.branchId;
+        const prioritasId = typeof row.prioritasId === 'object' && row.prioritasId !== null ? (row.prioritasId as any).id : row.prioritasId;
+        const picId = typeof row.picId === 'object' && row.picId !== null ? (row.picId as any).id : row.picId;
+        const latestActivityStatusId = typeof row.latestActivityStatusId === 'object' && row.latestActivityStatusId !== null ? (row.latestActivityStatusId as any).id : row.latestActivityStatusId;
+
+        const payload = {
+          code: row.code || '',
+          kode: row.kode || '',
+          branchId: branchId ? parseInt(String(branchId)) : 0,
+          namaCalonMitra: row.namaCalonMitra || '',
+          prioritasId: prioritasId ? parseInt(String(prioritasId)) : 0,
+          picId: picId ? parseInt(String(picId)) : 0,
+          jenisKerjaSama: row.jenisKerjaSama || '',
+          progressPercentage: parseInt(String(row.progressPercentage)) || 0,
+          latestUpdate: row.latestUpdate || '',
+          actionPlan: row.actionPlan || '',
+          targetDate: row.targetDate || null,
+          linkDokumen: row.linkDokumen || '',
+          latestActivity: row.latestActivity || '',
+          latestActivityStatusId: latestActivityStatusId ? parseInt(String(latestActivityStatusId)) : null,
+          sortOrder: row.sortOrder ?? 0
+        };
+
+        fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          keepalive: true
+        }).catch(err => console.error('Unmount save failed', err));
+      });
+    };
+  }, []);
 
   const addRow = () => {
     const newRow: PartnershipRow = {
