@@ -89,33 +89,27 @@ export default function ReportTab({ projects, masterData }: ReportTabProps) {
       {/* Chart */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">Prioritas Distribution</h3>
-        <div className="space-y-4">
+        <div className="flex items-end h-64 gap-2 sm:gap-4 overflow-x-auto pb-2">
           {Object.entries(priorityCounts).map(([priority, count]) => {
             const countNum = count as number;
             const percentage = maxCount > 0 ? (countNum / maxCount) * 100 : 0;
-            const colors: Record<string, string> = {
-              'Done': 'bg-green-500 dark:bg-green-600',
-              'High': 'bg-red-500 dark:bg-red-600',
-              'HOLD': 'bg-gray-500 dark:bg-gray-600',
-              'Low': 'bg-yellow-500 dark:bg-yellow-600',
-              'Medium': 'bg-orange-500 dark:bg-orange-600',
-              'STOP': 'bg-black dark:bg-gray-800',
-              'Selesai': 'bg-blue-500 dark:bg-blue-600',
-            };
 
             return (
-              <div key={priority}>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{priority}</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">{countNum} projects</span>
+              <div key={priority} className="flex-1 flex flex-col items-center justify-end group min-w-[60px] h-full">
+                <div className="mb-2 text-sm font-bold text-gray-700 dark:text-gray-300">
+                  {countNum}
                 </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-8 relative overflow-hidden">
-                  <div
-                    className={`h-8 rounded-full transition-all duration-500 flex items-center justify-center ${colors[priority] || 'bg-gray-500'}`}
-                    style={{ width: `${percentage}%`, minWidth: countNum > 0 ? '40px' : '0' }}
-                  >
-                    {countNum > 0 && <span className="text-white text-sm font-bold">{countNum}</span>}
+                <div
+                  className="w-10 sm:w-14 bg-blue-500 dark:bg-blue-600 rounded-t-lg transition-all duration-500 hover:bg-blue-600 dark:hover:bg-blue-500 relative"
+                  style={{ height: `${percentage}%` }}
+                >
+                  {/* Tooltip for small heights where text might not fit or just for clarity */}
+                  <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                    {countNum} Projects
                   </div>
+                </div>
+                <div className="mt-2 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 text-center truncate w-full">
+                  {priority}
                 </div>
               </div>
             );

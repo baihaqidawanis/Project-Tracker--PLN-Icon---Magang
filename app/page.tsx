@@ -17,7 +17,7 @@ type FullScreenMode = 'none' | 'workflow' | 'progress' | 'both';
 export default function ProjectTracker() {
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState('pivot');
+  const [activeTab, setActiveTab] = useState('page');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
@@ -111,18 +111,43 @@ export default function ProjectTracker() {
       };
       refetchPkrOpex();
     }
-    // Re-fetch Partnership data when switching to partnership tab
-    if (activeTab === 'partnership') {
+    // Re-fetch Partnership data when switching to partnership or pivot tab
+    // Need to fetch projects, pages, and workflows for progress calculation
+    if (activeTab === 'partnership' || activeTab === 'pivot') {
       const refetchPartnership = async () => {
         try {
-          const res = await fetch('/api/projects');
-          const data = await res.json();
-          setProjects(data);
+          const [projectsRes, pagesRes, workflowsRes] = await Promise.all([
+            fetch('/api/projects'),
+            fetch('/api/pages'),
+            fetch('/api/workflows')
+          ]);
+          const [projectsData, pagesData, workflowsData] = await Promise.all([
+            projectsRes.json(),
+            pagesRes.json(),
+            workflowsRes.json()
+          ]);
+          
+          setProjects(projectsData);
+          setPages(pagesData);
+          setWorkflows(workflowsData);
         } catch (error) {
           console.error('Error re-fetching Partnership:', error);
         }
       };
       refetchPartnership();
+    }
+    // Re-fetch projects when switching to pivot or report tab (untuk sinkronisasi data terbaru)
+    if (activeTab === 'pivot' || activeTab === 'report') {
+      const refetchProjects = async () => {
+        try {
+          const projectsRes = await fetch('/api/projects');
+          const projectsData = await projectsRes.json();
+          setProjects(projectsData);
+        } catch (error) {
+          console.error('Error re-fetching projects:', error);
+        }
+      };
+      refetchProjects();
     }
   }, [activeTab]);
 

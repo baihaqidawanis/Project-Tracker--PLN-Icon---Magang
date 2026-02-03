@@ -92,7 +92,23 @@ export default function PivotTab({ projects, masterData }: PivotTabProps) {
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{project.actionPlan}</td>
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{project.latestActivity}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{project.activityStatus}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{project.progress}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-6 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full transition-all duration-300"
+                            style={{ 
+                              width: `${Math.min(100, Math.max(0, project.progress || 0))}%`,
+                              backgroundColor: '#2563eb'
+                            }}
+                          >
+                          </div>
+                        </div>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 min-w-[45px]">
+                          {project.progress || 0}%
+                        </span>
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{project.prioritas}</td>
                   </tr>
                 ))

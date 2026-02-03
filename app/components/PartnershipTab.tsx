@@ -254,13 +254,57 @@ export default function PartnershipTab({
   const calculateProgress = (code: string): number => {
     if (!code || !pages || !workflows) return 0;
     const page = pages.find(p => p.pageNumber === code);
-    if (!page) return 0;
+    if (!page) {
+      if (code === 'P.01') {
+        console.log(`[${code}] Page not found! Available pages:`, pages?.map(p => p.pageNumber));
+      }
+      return 0;
+    }
 
-    const pageWorkflows = workflows.filter(w => w.pageId === page.id && w.type === 'sub');
+    // Calculate from workflow sub-tasks progress (matches TOTAL Progress% in PageTab)
+    const pageWorkflows = workflows.filter(w => w.pageId === page.id);
+    
+    if (code === 'P.01') {
+      console.log(`[${code}] DEBUG calculateProgress:`, {
+        pageFound: page.pageNumber,
+        pageId: page.id,
+        totalWorkflows: workflows.length,
+        pageWorkflows: pageWorkflows.length,
+        allWorkflowsData: workflows.map(w => ({
+          id: w.id,
+          pageId: w.pageId,
+          type: w.type,
+          status: w.status,
+          progress: w.progress,
+          bobot: w.bobot
+        })),
+        workflowDetails: pageWorkflows.map(w => ({
+          id: w.id,
+          pageId: w.pageId,
+          type: w.type,
+          status: w.status,
+          progress: w.progress,
+          bobot: w.bobot
+        }))
+      });
+    }
+    
     if (pageWorkflows.length === 0) return 0;
 
-    const totalProgress = pageWorkflows.reduce((sum, w) => sum + (w.progress || 0), 0);
-    // User requested "select from the Total row" which is a simple SUM of sub-tasks in PageTab.
+    // Sum dari progress. Fallback: kalau progress = 0 dan status = Done, pakai bobot
+    const totalProgress = pageWorkflows.reduce((sum, w) => {
+      let progressValue = parseInt(String(w.progress || 0));
+      // Fallback untuk data yang belum sync
+      if (progressValue === 0 && w.status === 'Done' && w.bobot > 0) {
+        progressValue = parseInt(String(w.bobot || 0));
+      }
+      return sum + progressValue;
+    }, 0);
+    
+    if (code === 'P.01') {
+      console.log(`[${code}] Total Progress:`, totalProgress);
+    }
+    
     return totalProgress;
   };
 
@@ -344,16 +388,50 @@ export default function PartnershipTab({
 
   // Load data into editable state with auto-calculations
   useEffect(() => {
+    console.log('useEffect triggered:', { 
+      projects: projects?.length, 
+      workflows: workflows?.length, 
+      pages: pages?.length 
+    });
+
     if (!projects || !Array.isArray(projects)) {
       setRows([]);
       return;
     }
 
+    // GUARD: Skip kalau workflows atau pages belum loaded
+    if (!workflows || !Array.isArray(workflows) || workflows.length === 0) {
+      console.log('Skipping: workflows not ready');
+      return;
+    }
+    if (!pages || !Array.isArray(pages) || pages.length === 0) {
+      console.log('Skipping: pages not ready');
+      return;
+    }
+
+    console.log('Processing partnership rows...');
     const partnershipRows = projects.map((p, index) => {
       const code = p.code || '';
       const updateData = getLatestUpdateData(code);
       const planData = getPlanData(code);
       const activityData = getActivityData(code);
+
+      // Always re-calculate progress to ensure it's fresh
+      const currentProgress = calculateProgress(code);
+      
+      // ALWAYS gunakan currentProgress dari workflows (langsung dari kolom Progress% total)
+      const finalProgress = currentProgress;
+      
+      if (code === 'P.01') {
+        console.log(`[${code}] finalProgress yang akan diset:`, finalProgress);
+      }
+
+      // Check if auto-calculated fields have changed
+      const hasProgressChanged = finalProgress !== p.progressPercentage;
+      const hasActivityChanged = activityData.statusId !== p.latestActivityStatusId;
+      const hasUpdateChanged = updateData.date !== p.latestDateUpdated || updateData.description !== p.latestUpdate;
+      const hasPlanChanged = planData.actionPlan !== p.actionPlan || planData.target !== p.targetDate;
+      const needsSave = hasProgressChanged || hasActivityChanged || hasUpdateChanged || hasPlanChanged;
 
       return {
         ...p,
@@ -364,8 +442,8 @@ export default function PartnershipTab({
         prioritasId: p.prioritasId || '',
         picId: p.picId || '',
 
-        // Auto-calculated fields
-        progressPercentage: calculateProgress(code),
+        // Auto-calculated fields - use fresh calculations
+        progressPercentage: finalProgress,
         latestDateUpdated: updateData.date,
         latestUpdate: updateData.description,
         actionPlan: planData.actionPlan,
@@ -379,7 +457,7 @@ export default function PartnershipTab({
         jenisKerjaSama: p.jenisKerjaSama || '',
         linkDokumen: p.linkDokumen || '',
         sortOrder: p.sortOrder !== undefined ? p.sortOrder : index,
-        isDirty: false,
+        isDirty: needsSave, // Mark dirty if auto-calculated fields changed
         isNew: false,
       };
     });
@@ -404,6 +482,62 @@ export default function PartnershipTab({
     });
 
     setRows(sorted);
+    
+    // Debug: check state after setRows
+    const p01Row = sorted.find(r => r.code === 'P.01');
+    if (p01Row) {
+      console.log('[P.01] Row in state after setRows:', {
+        code: p01Row.code,
+        progressPercentage: p01Row.progressPercentage,
+        isDirty: p01Row.isDirty
+      });
+    }
+    
+    // Trigger auto-save jika ada row yang berubah (untuk save auto-calculated fields ke DB)
+    const hasDirtyRows = sorted.some(row => row.isDirty);
+    if (hasDirtyRows) {
+      setTimeout(() => {
+        const dirtyRows = sorted.filter(r => r.isDirty && r.id);
+        if (dirtyRows.length > 0) {
+          console.log(`Auto-saving ${dirtyRows.length} partnership rows with updated progress...`);
+          dirtyRows.forEach(async (row) => {
+            try {
+              const branchId = typeof row.branchId === 'object' && row.branchId !== null ? (row.branchId as any).id : row.branchId;
+              const prioritasId = typeof row.prioritasId === 'object' && row.prioritasId !== null ? (row.prioritasId as any).id : row.prioritasId;
+              const picId = typeof row.picId === 'object' && row.picId !== null ? (row.picId as any).id : row.picId;
+              const latestActivityStatusId = typeof row.latestActivityStatusId === 'object' && row.latestActivityStatusId !== null ? (row.latestActivityStatusId as any).id : row.latestActivityStatusId;
+
+              const payload = {
+                code: row.code,
+                kode: row.kode || null,
+                branchId: branchId ? parseInt(String(branchId)) : null,
+                namaCalonMitra: row.namaCalonMitra,
+                prioritasId: prioritasId ? parseInt(String(prioritasId)) : null,
+                picId: picId ? parseInt(String(picId)) : null,
+                jenisKerjaSama: row.jenisKerjaSama || null,
+                progressPercentage: row.progressPercentage || 0,
+                latestDateUpdated: row.latestDateUpdated || null,
+                latestUpdate: row.latestUpdate || null,
+                actionPlan: row.actionPlan || null,
+                targetDate: row.targetDate || null,
+                linkDokumen: row.linkDokumen || null,
+                latestActivity: row.latestActivity || null,
+                latestActivityStatusId: latestActivityStatusId ? parseInt(String(latestActivityStatusId)) : null,
+                sortOrder: row.sortOrder !== undefined ? row.sortOrder : 0,
+              };
+
+              await fetch(`/api/projects/${row.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+              });
+            } catch (err) {
+              console.error('Failed to auto-save partnership row:', err);
+            }
+          });
+        }
+      }, 500);
+    }
   }, [projects, pages, workflows, dailyProgress, masterData]);
 
   // Global event handlers
@@ -1062,8 +1196,22 @@ export default function PartnershipTab({
 
                           {/* Progress % - READ ONLY (auto-calculated) */}
                           <td className="px-2 py-1" style={{ width: columnWidths.progressPercentage }}>
-                            <div className="w-full px-2 py-1 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded">
-                              {row.progressPercentage}%
+                            <div className="w-full px-2 py-1">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-6 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full transition-all duration-300"
+                                    style={{ 
+                                      width: `${Math.min(100, Math.max(0, row.progressPercentage || 0))}%`,
+                                      backgroundColor: '#2563eb'
+                                    }}
+                                  >
+                                  </div>
+                                </div>
+                                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 min-w-[45px] text-right">
+                                  {row.progressPercentage || 0}%
+                                </span>
+                              </div>
                             </div>
                           </td>
 
