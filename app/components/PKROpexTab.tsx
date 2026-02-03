@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, ClipboardEvent } from 'react';
-import { Plus, Trash2, ZoomIn, ZoomOut, GripVertical, Loader2, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, ZoomIn, ZoomOut, GripVertical, Loader2, CheckCircle, Upload, Eye, X } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -244,7 +244,7 @@ export default function PKROpexTab({
     description: 250,
     saldoTopUp: 140,
     saldoPRK: 140,
-    evidence: 150,
+    evidence: 280,
     pic: 100,
   });
 
@@ -418,6 +418,32 @@ export default function PKROpexTab({
       newRows[index] = { ...newRows[index], [field]: value, isDirty: true };
       return newRows;
     });
+  };
+
+  // File upload handler
+  const handleFileUpload = async (index: number, file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        alert(error.error || 'Failed to upload file');
+        return;
+      }
+
+      const data = await response.json();
+      // Update cell with file path
+      updateCell(index, 'evidence', data.path);
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload file');
+    }
   };
 
   const addRow = () => {
@@ -847,19 +873,58 @@ export default function PKROpexTab({
                               )}
                             </div>
                           </td>
+                          {/* Evidence - FILE UPLOAD */}
                           <td className="px-2 py-1" style={{ width: columnWidths.evidence }}>
                             <div className={`relative w-full ${isCellInSelection(idx, 'evidence') ? 'ring-2 ring-blue-500 z-10' : ''}`}
                               onMouseEnter={() => handleFillMouseEnter(idx, 'evidence')}>
-                              <input
-                                type="url"
-                                value={row.evidence}
-                                onFocus={() => handleCellFocus(idx, 'evidence')}
-                                onChange={(e) => updateCell(idx, 'evidence', e.target.value)}
-                                onPaste={(e) => handlePaste(e, idx, 5)}
-                                className="w-full px-2 py-1 bg-transparent border-0 focus:ring-1 focus:ring-blue-500 rounded dark:text-gray-100"
-                                style={{ fontSize: 10 }}
-                                placeholder="https://..."
-                              />
+                              <div className="flex items-center gap-1">
+                                {/* Upload Button */}
+                                <label className="flex items-center justify-center px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer text-xs">
+                                  <Upload className="w-3 h-3 mr-1" />
+                                  <span>Upload</span>
+                                  <input
+                                    type="file"
+                                    accept="image/jpeg,image/jpg,image/png,application/pdf"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        handleFileUpload(idx, file);
+                                      }
+                                    }}
+                                  />
+                                </label>
+                                
+                                {/* Show filename/preview if evidence exists */}
+                                {row.evidence && (
+                                  <>
+                                    {/* View/Download button */}
+                                    <a 
+                                      href={row.evidence} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs"
+                                      title="View file"
+                                    >
+                                      <Eye className="w-3 h-3" />
+                                    </a>
+                                    
+                                    {/* Delete button */}
+                                    <button
+                                      onClick={() => updateCell(idx, 'evidence', '')}
+                                      className="flex items-center px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
+                                      title="Remove file"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                    
+                                    {/* Show filename */}
+                                    <span className="text-xs truncate flex-1 dark:text-gray-300" title={row.evidence}>
+                                      {row.evidence.split('/').pop()}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
                               {isCellActive(idx, 'evidence') && !isDraggingFill && (
                                 <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-blue-600 border border-white cursor-crosshair z-20" onMouseDown={(e) => handleFillMouseDown(e, idx)} />
                               )}

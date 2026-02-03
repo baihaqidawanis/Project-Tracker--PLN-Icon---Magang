@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import Header from './components/header';
 import TabNavigation from './components/TabNavigation';
@@ -287,7 +287,7 @@ export default function ProjectTracker() {
   };
 
   // Sync handler for PageTab unmount - updates parent state with latest child data
-  const handlePageTabSync = (pageId: number, workflowsData: any[], progressData: any[]) => {
+  const handlePageTabSync = useCallback((pageId: number, workflowsData: any[], progressData: any[]) => {
     // Update workflows: remove old data for this page and add fresh data
     setWorkflows(prev => {
       const otherPages = prev.filter(w => w.pageId !== pageId);
@@ -299,7 +299,7 @@ export default function ProjectTracker() {
       const otherPages = prev.filter(dp => dp.pageId !== pageId);
       return [...otherPages, ...progressData.map(p => ({ ...p, pageId }))];
     });
-  };
+  }, []);
 
   // FIXED: Check if we should hide header/sidebar based on fullScreenMode
   const shouldHideNavigation = fullScreenMode !== 'none';
