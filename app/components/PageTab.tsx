@@ -1379,6 +1379,23 @@ export default function PageTab({
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Daily Progress</h3>
 
                     <div className="flex items-center gap-3 flex-wrap">
+                      {/* Save Status Indicator */}
+                      <div className="min-w-[100px]">
+                        {saveStatus === 'saving' && (
+                          <span className="text-xs text-blue-600 font-medium flex items-center gap-1 animate-pulse">
+                            <Loader2 size={14} className="animate-spin" /> Saving...
+                          </span>
+                        )}
+                        {saveStatus === 'saved' && (
+                          <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                            <CheckCircle size={14} /> All saved
+                          </span>
+                        )}
+                        {saveStatus === 'error' && (
+                          <span className="text-xs text-red-600 font-medium">Error saving</span>
+                        )}
+                      </div>
+
                       {/* Zoom Control */}
                       <div className="flex items-center gap-2">
                         <button
