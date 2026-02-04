@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Moon, Sun, Menu } from 'lucide-react';
+import { Moon, Sun, Menu, LogOut, User } from 'lucide-react';
+import { signOut, useSession } from 'next-auth/react';
 
 interface HeaderProps {
   darkMode: boolean;
@@ -12,6 +13,12 @@ interface HeaderProps {
 }
 
 export default function Header({ darkMode, setDarkMode, sidebarCollapsed, setSidebarCollapsed, setActiveTab }: HeaderProps) {
+  const { data: session } = useSession();
+
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: '/login' });
+  };
+
   return (
     <div className="bg-[#00A3E0] dark:bg-[#0082B8] text-white shadow-lg fixed top-0 left-0 right-0 z-50">
       <div className="px-4 sm:px-6 lg:px-8 py-3">
@@ -37,6 +44,26 @@ export default function Header({ darkMode, setDarkMode, sidebarCollapsed, setSid
             </div>
           </div>
 
+          {/* User Info & Actions */}
+          <div className="flex items-center gap-3">
+            {/* User Info */}
+            {session?.user && (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg">
+                <User size={16} />
+                <span className="text-sm font-medium text-white">{session.user.name}</span>
+              </div>
+            )}
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center gap-2"
+              title="Logout"
+            >
+              <LogOut size={18} />
+              <span className="hidden sm:inline text-sm font-medium">Logout</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

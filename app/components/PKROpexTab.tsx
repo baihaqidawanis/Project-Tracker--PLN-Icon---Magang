@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { formatDateShort, formatDateForInput } from '../utils/date-utils';
+import { formatDateShort, formatDateForInput } from '../lib/date-utils';
 
 interface PKROpexRow {
   clientId: string;

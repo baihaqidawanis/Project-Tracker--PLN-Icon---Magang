@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Select from 'react-select';
-import { formatDateShort, formatDateForInput } from '../utils/date-utils';
+import { formatDateShort, formatDateForInput } from '../lib/date-utils';
 
 interface WorkflowRow {
   clientId: string; // For frontend DnD stability
