@@ -65,6 +65,21 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
+    // Optimistic locking: Check if data was modified by someone else
+    if (data.lastSeenUpdatedAt) {
+      const current = await prisma.workflow.findUnique({
+        where: { id: parseInt(data.id) },
+        select: { updatedAt: true }
+      });
+      
+      if (current && new Date(current.updatedAt).getTime() > new Date(data.lastSeenUpdatedAt).getTime()) {
+        return NextResponse.json({ 
+          error: 'conflict', 
+          message: 'Data sudah diupdate oleh user lain. Refresh untuk melihat perubahan terbaru.' 
+        }, { status: 409 });
+      }
+    }
+
     const workflow = await prisma.workflow.update({
       where: { id: parseInt(data.id) },
       data: {
@@ -75,6 +90,7 @@ export async function PUT(request: Request) {
         status: data.status,
         progress: parseInt(data.progress) || 0,
         sortOrder: data.sortOrder !== undefined ? parseInt(data.sortOrder) : 0,
+        lastEditedBy: data.userEmail || null, // Track who edited
       },
       include: {
         page: true,

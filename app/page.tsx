@@ -130,6 +130,11 @@ export default function ProjectTracker() {
 
   // Fetch all data on mount
   useEffect(() => {
+    // Don't fetch if not authenticated
+    if (status !== 'authenticated') {
+      return;
+    }
+
     const fetchAllData = async () => {
       setLoading(true);
       try {
@@ -164,7 +169,7 @@ export default function ProjectTracker() {
       }
     };
     fetchAllData();
-  }, []);
+  }, [status]); // Add status dependency
 
   // Sync handler for PageTab unmount - updates parent state with latest child data
   const handlePageTabSync = useCallback((pageId: number, workflowsData: any[], progressData: any[]) => {

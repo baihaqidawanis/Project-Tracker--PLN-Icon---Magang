@@ -66,6 +66,21 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
+    // Optimistic locking: Check if data was modified by someone else
+    if (data.lastSeenUpdatedAt) {
+      const current = await prisma.dailyProgress.findUnique({
+        where: { id: parseInt(data.id) },
+        select: { updatedAt: true }
+      });
+      
+      if (current && new Date(current.updatedAt).getTime() > new Date(data.lastSeenUpdatedAt).getTime()) {
+        return NextResponse.json({ 
+          error: 'conflict', 
+          message: 'Data sudah diupdate oleh user lain. Refresh untuk melihat perubahan terbaru.' 
+        }, { status: 409 });
+      }
+    }
+
     const progress = await prisma.dailyProgress.update({
       where: { id: parseInt(data.id) },
       data: {
@@ -76,6 +91,7 @@ export async function PUT(request: Request) {
         pic: data.pic,
         category: data.category,
         sortOrder: data.sortOrder !== undefined ? parseInt(data.sortOrder) : 0,
+        lastEditedBy: data.userEmail || null,
       },
       include: {
         page: true,

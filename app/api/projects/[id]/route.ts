@@ -62,6 +62,21 @@ export async function PUT(
       return isNaN(parsed) || parsed === 0 ? null : parsed;
     };
 
+    // Optimistic locking: Check if data was modified by someone else
+    if (data.lastSeenUpdatedAt) {
+      const current = await prisma.project.findUnique({
+        where: { id },
+        select: { updatedAt: true }
+      });
+      
+      if (current && new Date(current.updatedAt).getTime() > new Date(data.lastSeenUpdatedAt).getTime()) {
+        return NextResponse.json({ 
+          error: 'conflict', 
+          message: 'Data sudah diupdate oleh user lain. Refresh untuk melihat perubahan terbaru.' 
+        }, { status: 409 });
+      }
+    }
+
     // Prepare update data
     const updateData: any = {
       code: data.code,
@@ -78,6 +93,7 @@ export async function PUT(
       linkDokumen: data.linkDokumen,
       latestActivity: data.latestActivity,
       latestActivityStatusId: parseId(data.latestActivityStatusId),
+      lastEditedBy: data.userEmail || null, // Track who edited
     };
 
     // Try to add sortOrder if supported

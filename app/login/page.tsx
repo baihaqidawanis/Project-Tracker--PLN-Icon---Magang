@@ -44,7 +44,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <img src="/image.png" alt="PLN Icon Plus" className="w-20 h-20 mx-auto mb-4 rounded-2xl shadow-lg" />
+          <img src="image.png" alt="PLN Icon Plus" className="w-20 h-20 mx-auto mb-4 rounded-2xl shadow-lg" />
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">PLN Icon Plus</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">Partnership Project Tracker</p>
         </div>

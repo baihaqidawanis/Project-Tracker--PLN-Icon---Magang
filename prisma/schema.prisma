@@ -92,6 +92,7 @@ model Project {
   latestActivityStatusId  Int?
   latestActivityStatus    MasterStatus?  @relation(fields: [latestActivityStatusId], references: [id])
   sortOrder               Int            @default(0)
+  lastEditedBy            String?        // Email of last editor for audit
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
 }
@@ -119,6 +120,7 @@ model Workflow {
   status     String?
   progress   Int      @default(0)
   sortOrder  Int      @default(0)
+  lastEditedBy String? // Email of last editor for audit
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
@@ -135,6 +137,7 @@ model DailyProgress {
   pic           String
   category      String?
   sortOrder     Int       @default(0)
+  lastEditedBy  String?   // Email of last editor for audit
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -150,6 +153,7 @@ model PKROpex {
   evidence        String?
   pic             String
   sortOrder       Int      @default(0)
+  lastEditedBy    String?  // Email of last editor for audit
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

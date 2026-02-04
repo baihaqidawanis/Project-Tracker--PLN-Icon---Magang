@@ -44,6 +44,22 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const data = await request.json();
+
+    // Optimistic locking: Check if data was modified by someone else
+    if (data.lastSeenUpdatedAt) {
+      const current = await prisma.pKROpex.findUnique({
+        where: { id: parseInt(data.id) },
+        select: { updatedAt: true }
+      });
+      
+      if (current && new Date(current.updatedAt).getTime() > new Date(data.lastSeenUpdatedAt).getTime()) {
+        return NextResponse.json({ 
+          error: 'conflict', 
+          message: 'Data sudah diupdate oleh user lain. Refresh untuk melihat perubahan terbaru.' 
+        }, { status: 409 });
+      }
+    }
+
     const pkr = await prisma.pKROpex.update({
       where: { id: parseInt(data.id) },
       data: {
@@ -55,6 +71,7 @@ export async function PUT(request: Request) {
         evidence: data.evidence,
         pic: data.pic,
         sortOrder: data.sortOrder !== undefined ? data.sortOrder : 0,
+        lastEditedBy: data.userEmail || null,
       },
     });
     return NextResponse.json(pkr);
