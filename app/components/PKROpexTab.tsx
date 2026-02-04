@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef, ClipboardEvent } from 'react';
 import { Plus, Trash2, ZoomIn, ZoomOut, GripVertical, Loader2, CheckCircle, Upload, Eye, X } from 'lucide-react';
+import { ConfirmDialog } from './ConfirmDialog';
+import { useUndoRedo } from '../hooks/useUndoRedo';
 import {
   DndContext,
   closestCenter,
@@ -161,6 +163,17 @@ export default function PKROpexTab({
 
   const [rows, setRows] = useState<PKROpexRow[]>([]);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  
+  // Checkbox multi-select state
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // Ref for save-on-unmount
   const rowsRef = useRef(rows);
@@ -438,11 +451,44 @@ export default function PKROpexTab({
       }
 
       const data = await response.json();
-      // Update cell with file path
-      updateCell(index, 'evidence', data.path);
+      // Update cell with S3 presigned URL
+      updateCell(index, 'evidence', data.url);
     } catch (error) {
       console.error('Upload error:', error);
       alert('Failed to upload file');
+    }
+  };
+
+  // File delete handler
+  const handleFileDelete = async (index: number, fileUrl: string) => {
+    try {
+      // Extract S3 key from presigned URL
+      // MinIO presigned URL format: http://localhost:9000/plnprojecttracker/evidence/filename.ext?X-Amz-...
+      const urlObj = new URL(fileUrl);
+      const pathParts = urlObj.pathname.split('/').filter(p => p); // Remove empty strings
+      // pathParts = ['plnprojecttracker', 'evidence', 'filename.ext']
+      const s3Key = pathParts.slice(1).join('/'); // Skip bucket name, get 'evidence/filename.ext'
+      
+      if (!s3Key) {
+        alert('Invalid file URL');
+        return;
+      }
+      
+      const response = await fetch(`/api/upload/${encodeURIComponent(s3Key)}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        alert(error.error || 'Failed to delete file');
+        return;
+      }
+
+      // Clear evidence cell
+      updateCell(index, 'evidence', '');
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Failed to delete file');
     }
   };
 
@@ -466,10 +512,70 @@ export default function PKROpexTab({
 
   const deleteRow = async (index: number) => {
     const row = rows[index];
-    if (row.id) {
-      await onDelete('pkr-opex', row.id);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Row',
+      message: 'Are you sure you want to delete this row? This action cannot be undone.',
+      onConfirm: async () => {
+        if (row.id) {
+          await onDelete('pkr-opex', row.id);
+        }
+        setRows(prev => prev.filter((_, i) => i !== index));
+        // Remove from selection if selected
+        setSelectedRows(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(row.clientId);
+          return newSet;
+        });
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+      }
+    });
+  };
+  
+  // Bulk delete selected rows
+  const deleteBulk = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Selected Rows',
+      message: `Are you sure you want to delete ${selectedRows.size} selected row(s)? This action cannot be undone.`,
+      onConfirm: async () => {
+        const rowsToDelete = rows.filter(row => selectedRows.has(row.clientId));
+        
+        // Delete from backend
+        for (const row of rowsToDelete) {
+          if (row.id) {
+            await onDelete('pkr-opex', row.id);
+          }
+        }
+        
+        // Remove from state
+        setRows(prev => prev.filter(row => !selectedRows.has(row.clientId)));
+        setSelectedRows(new Set());
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+      }
+    });
+  };
+  
+  // Toggle row selection
+  const toggleRowSelection = (clientId: string) => {
+    setSelectedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(clientId)) {
+        newSet.delete(clientId);
+      } else {
+        newSet.add(clientId);
+      }
+      return newSet;
+    });
+  };
+  
+  // Select/deselect all rows
+  const toggleSelectAll = () => {
+    if (selectedRows.size === rows.length) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(rows.map(row => row.clientId)));
     }
-    setRows(prev => prev.filter((_, i) => i !== index));
   };
 
   const handlePaste = (e: ClipboardEvent, rowIndex: number, colIndex: number) => {
@@ -667,6 +773,17 @@ export default function PKROpexTab({
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Daily Progress</p>
           </div>
           <div className="flex gap-3 items-center">
+            {/* Bulk Delete Button */}
+            {selectedRows.size > 0 && (
+              <button
+                onClick={deleteBulk}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md transition-colors"
+              >
+                <Trash2 size={18} />
+                Delete Selected ({selectedRows.size})
+              </button>
+            )}
+            
             {/* Zoom Controls */}
             <div className="flex items-center gap-2 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600">
               <button
@@ -740,6 +857,15 @@ export default function PKROpexTab({
                 <thead className="bg-blue-50 dark:bg-gray-900 sticky top-0 z-10">
                   <tr>
                     <th className="px-1 py-2 w-8"></th>
+                    <th className="px-2 py-2 w-8 text-center">
+                      <input
+                        type="checkbox"
+                        checked={rows.length > 0 && selectedRows.size === rows.length}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 cursor-pointer"
+                        title="Select all"
+                      />
+                    </th>
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.date }}>
                       Date
                       <ResizeHandle column="date" onResizeStart={handleColumnResizeStart} />
@@ -778,7 +904,7 @@ export default function PKROpexTab({
                   >
                     {rows.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={10} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                           No PKR Opex entries found. Click "Add Row" to create one.
                         </td>
                       </tr>
@@ -787,8 +913,17 @@ export default function PKROpexTab({
                         <SortableRow
                           key={row.clientId}
                           id={row.clientId}
-                          className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${row.isDirty ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}`}
+                          className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${row.isDirty ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''} ${selectedRows.has(row.clientId) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
                         >
+                          <td className="px-2 py-1 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedRows.has(row.clientId)}
+                              onChange={() => toggleRowSelection(row.clientId)}
+                              className="w-4 h-4 cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </td>
                           <td className="px-2 py-1" style={{ width: columnWidths.date }}>
                             <div className={`relative w-full ${isCellInSelection(idx, 'date') ? 'ring-2 ring-blue-500 z-10' : ''}`}
                               onMouseEnter={() => handleFillMouseEnter(idx, 'date')}>
@@ -911,7 +1046,7 @@ export default function PKROpexTab({
                                     
                                     {/* Delete button */}
                                     <button
-                                      onClick={() => updateCell(idx, 'evidence', '')}
+                                      onClick={() => handleFileDelete(idx, row.evidence)}
                                       className="flex items-center px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
                                       title="Remove file"
                                     >
@@ -968,6 +1103,18 @@ export default function PKROpexTab({
           </div>
         </div>
       </div>
+      
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmButtonClass="bg-red-600 hover:bg-red-700"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} })}
+      />
     </div>
   );
 }

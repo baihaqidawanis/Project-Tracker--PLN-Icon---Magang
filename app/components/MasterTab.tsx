@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Undo2, Redo2 } from 'lucide-react';
+import { ConfirmDialog } from './ConfirmDialog';
+import { useUndoRedo } from '../hooks/useUndoRedo';
 
 interface MasterTabProps {
   masterData: any;
@@ -13,6 +15,17 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
   const [newItemName, setNewItemName] = useState('');
   const [newItemEmail, setNewItemEmail] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  
+  // Checkbox multi-select state
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const sections = [
     { id: 'prioritas', label: 'Prioritas', data: masterData.prioritas },
@@ -60,22 +73,85 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this item?')) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Item',
+      message: 'Are you sure you want to delete this item? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/master?type=${activeSection}&id=${id}`, {
+            method: 'DELETE',
+          });
 
-    try {
-      const res = await fetch(`/api/master?type=${activeSection}&id=${id}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        onRefresh();
-      } else {
-        const error = await res.json();
-        alert(error.error || 'Failed to delete item');
+          if (res.ok) {
+            onRefresh();
+            // Remove from selection if selected
+            setSelectedRows(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(id);
+              return newSet;
+            });
+          } else {
+            const error = await res.json();
+            alert(error.error || 'Failed to delete item');
+          }
+        } catch (error) {
+          alert('Failed to delete item');
+        } finally {
+          setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+        }
       }
-    } catch (error) {
-      alert('Failed to delete item');
+    });
+  };
+  
+  // Toggle row selection
+  const toggleRowSelection = (id: number) => {
+    setSelectedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+  
+  // Select/deselect all rows
+  const toggleSelectAll = () => {
+    const currentData = currentSection?.data || [];
+    if (selectedRows.size === currentData.length) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(currentData.map((item: any) => item.id)));
     }
+  };
+  
+  // Bulk delete selected rows
+  const handleBulkDelete = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Selected Items',
+      message: `Are you sure you want to delete ${selectedRows.size} selected item(s)? This action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          // Delete all selected items
+          const deletePromises = Array.from(selectedRows).map(id =>
+            fetch(`/api/master?type=${activeSection}&id=${id}`, {
+              method: 'DELETE',
+            })
+          );
+          
+          await Promise.all(deletePromises);
+          onRefresh();
+          setSelectedRows(new Set());
+        } catch (error) {
+          alert('Failed to delete items');
+        } finally {
+          setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+        }
+      }
+    });
   };
 
   return (
@@ -136,23 +212,66 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
       {/* Master Data Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="px-6 py-4 bg-blue-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {currentSection?.label} List
-          </h3>
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {currentSection?.label} List
+            </h3>
+            
+            <div className="flex gap-3 items-center">
+              {/* Bulk Delete Button */}
+              {selectedRows.size > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md transition-colors"
+                >
+                  <Trash2 size={18} />
+                  Delete Selected ({selectedRows.size})
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="p-6">
+          {/* Select All Checkbox */}
+          {currentSection?.data?.length > 0 && (
+            <div className="mb-4 flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={currentSection?.data?.length > 0 && selectedRows.size === currentSection?.data?.length}
+                onChange={toggleSelectAll}
+                className="w-4 h-4 cursor-pointer"
+              />
+              <label className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer" onClick={toggleSelectAll}>
+                Select All
+              </label>
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {currentSection?.data?.map((item: any) => (
               <div
                 key={item.id}
-                className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600"
+                className={`flex justify-between items-center p-3 rounded-lg border ${
+                  selectedRows.has(item.id)
+                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700'
+                    : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
+                }`}
               >
-                <div className="flex-1">
-                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.name}</span>
-                  {item.email && (
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{item.email}</div>
-                  )}
+                <div className="flex items-center gap-3 flex-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedRows.has(item.id)}
+                    onChange={() => toggleRowSelection(item.id)}
+                    className="w-4 h-4 cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.name}</span>
+                    {item.email && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{item.email}</div>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={() => handleDelete(item.id)}
@@ -172,6 +291,18 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
           )}
         </div>
       </div>
+      
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmButtonClass="bg-red-600 hover:bg-red-700"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} })}
+      />
     </div>
   );
 }

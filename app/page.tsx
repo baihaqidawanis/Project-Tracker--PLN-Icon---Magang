@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import Header from './components/header';
 import TabNavigation from './components/TabNavigation';
@@ -15,9 +17,13 @@ import Modal from './components/Modal';
 type FullScreenMode = 'none' | 'workflow' | 'progress' | 'both';
 
 export default function ProjectTracker() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  
+  // ALL STATE DECLARATIONS MUST BE AT THE TOP - Before any conditionals or returns
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState('page');
+  const [activeTab, setActiveTab] = useState('pivot');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
@@ -40,14 +46,22 @@ export default function ProjectTracker() {
     activityTypes: []
   });
 
-  // Full-screen state - FIXED: Changed from boolean to FullScreenMode type
+  // Full-screen state
   const [fullScreenMode, setFullScreenMode] = useState<FullScreenMode>('none');
+  
+  // ALL useEffect HOOKS - Must be declared before any conditional returns
+  
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
 
   // Load full-screen preference from localStorage
   useEffect(() => {
     const savedFullScreen = localStorage.getItem('pln_fullscreen');
     if (savedFullScreen) {
-      // Parse saved value as FullScreenMode
       const parsed = savedFullScreen as FullScreenMode;
       if (['none', 'workflow', 'progress', 'both'].includes(parsed)) {
         setFullScreenMode(parsed);
@@ -64,7 +78,6 @@ export default function ProjectTracker() {
   useEffect(() => {
     const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     setDarkMode(isDark);
-
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => setDarkMode(e.matches);
     mediaQuery.addEventListener('change', handleChange);
@@ -84,77 +97,103 @@ export default function ProjectTracker() {
     const savedTab = localStorage.getItem('activeTab');
     if (savedTab) {
       setActiveTab(savedTab);
+    } else {
+      setActiveTab('pivot');
     }
   }, []);
 
-  // Save sidebar state to localStorage
+  // Save sidebar state
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', sidebarCollapsed.toString());
   }, [sidebarCollapsed]);
 
-  // Save active tab to localStorage
+  // Save active tab
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
 
-  // Re-fetch PKR Opex data when switching to pkr-opex tab to get latest changes
+  // Re-fetch data when tab changes
   useEffect(() => {
     if (activeTab === 'pkr-opex') {
-      const refetchPkrOpex = async () => {
-        try {
-          const res = await fetch('/api/pkr-opex');
-          const data = await res.json();
-          setPkrOpex(data);
-        } catch (error) {
-          console.error('Error re-fetching PKR Opex:', error);
-        }
-      };
-      refetchPkrOpex();
+      fetch('/api/pkr-opex').then(r => r.json()).then(setPkrOpex).catch(console.error);
     }
-    // Re-fetch Partnership data when switching to partnership or pivot tab
-    // Need to fetch projects, pages, and workflows for progress calculation
     if (activeTab === 'partnership' || activeTab === 'pivot') {
-      const refetchPartnership = async () => {
-        try {
-          const [projectsRes, pagesRes, workflowsRes] = await Promise.all([
-            fetch('/api/projects'),
-            fetch('/api/pages'),
-            fetch('/api/workflows')
-          ]);
-          const [projectsData, pagesData, workflowsData] = await Promise.all([
-            projectsRes.json(),
-            pagesRes.json(),
-            workflowsRes.json()
-          ]);
-          
-          setProjects(projectsData);
-          setPages(pagesData);
-          setWorkflows(workflowsData);
-        } catch (error) {
-          console.error('Error re-fetching Partnership:', error);
-        }
-      };
-      refetchPartnership();
+      Promise.all([fetch('/api/projects'), fetch('/api/pages'), fetch('/api/workflows')])
+        .then(responses => Promise.all(responses.map(r => r.json())))
+        .then(([p, pg, w]) => { setProjects(p); setPages(pg); setWorkflows(w); })
+        .catch(console.error);
     }
-    // Re-fetch projects when switching to pivot or report tab (untuk sinkronisasi data terbaru)
     if (activeTab === 'pivot' || activeTab === 'report') {
-      const refetchProjects = async () => {
-        try {
-          const projectsRes = await fetch('/api/projects');
-          const projectsData = await projectsRes.json();
-          setProjects(projectsData);
-        } catch (error) {
-          console.error('Error re-fetching projects:', error);
-        }
-      };
-      refetchProjects();
+      fetch('/api/projects').then(r => r.json()).then(setProjects).catch(console.error);
     }
   }, [activeTab]);
 
   // Fetch all data on mount
   useEffect(() => {
+    const fetchAllData = async () => {
+      setLoading(true);
+      try {
+        const [projectsRes, pagesRes, workflowsRes, progressRes, pkrRes, masterRes] = await Promise.all([
+          fetch('/api/projects'),
+          fetch('/api/pages'),
+          fetch('/api/workflows'),
+          fetch('/api/daily-progress'),
+          fetch('/api/pkr-opex'),
+          fetch('/api/master')
+        ]);
+
+        const [projectsData, pagesData, workflowsData, progressData, pkrData, masterData] = await Promise.all([
+          projectsRes.json(),
+          pagesRes.json(),
+          workflowsRes.json(),
+          progressRes.json(),
+          pkrRes.json(),
+          masterRes.json()
+        ]);
+
+        setProjects(projectsData);
+        setPages(pagesData);
+        setWorkflows(workflowsData);
+        setDailyProgress(progressData);
+        setPkrOpex(pkrData);
+        setMasterData(masterData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchAllData();
   }, []);
+
+  // Sync handler for PageTab unmount - updates parent state with latest child data
+  const handlePageTabSync = useCallback((pageId: number, workflowsData: any[], progressData: any[]) => {
+    // Update workflows: remove old data for this page and add fresh data
+    setWorkflows(prev => {
+      const otherPages = prev.filter(w => w.pageId !== pageId);
+      return [...otherPages, ...workflowsData.map(w => ({ ...w, pageId }))];
+    });
+
+    // Update daily progress: remove old data for this page and add fresh data
+    setDailyProgress(prev => {
+      const otherPages = prev.filter(dp => dp.pageId !== pageId);
+      return [...otherPages, ...progressData.map(p => ({ ...p, pageId }))];
+    });
+  }, []);
+
+  // Show loading while checking auth
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated
+  if (!session) {
+    return null;
+  }
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -285,21 +324,6 @@ export default function ProjectTracker() {
       setLoading(false);
     }
   };
-
-  // Sync handler for PageTab unmount - updates parent state with latest child data
-  const handlePageTabSync = useCallback((pageId: number, workflowsData: any[], progressData: any[]) => {
-    // Update workflows: remove old data for this page and add fresh data
-    setWorkflows(prev => {
-      const otherPages = prev.filter(w => w.pageId !== pageId);
-      return [...otherPages, ...workflowsData.map(w => ({ ...w, pageId }))];
-    });
-
-    // Update daily progress: remove old data for this page and add fresh data
-    setDailyProgress(prev => {
-      const otherPages = prev.filter(dp => dp.pageId !== pageId);
-      return [...otherPages, ...progressData.map(p => ({ ...p, pageId }))];
-    });
-  }, []);
 
   // FIXED: Check if we should hide header/sidebar based on fullScreenMode
   const shouldHideNavigation = fullScreenMode !== 'none';

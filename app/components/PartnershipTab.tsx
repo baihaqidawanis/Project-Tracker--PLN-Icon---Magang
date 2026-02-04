@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef, ClipboardEvent } from 'react';
 import { Plus, Trash2, GripVertical, ZoomIn, ZoomOut, Maximize2, Minimize2, CheckCircle, Loader2 } from 'lucide-react';
+import { ConfirmDialog } from './ConfirmDialog';
+import { useUndoRedo } from '../hooks/useUndoRedo';
 import {
   DndContext,
   closestCenter,
@@ -156,6 +158,17 @@ export default function PartnershipTab({
   const [rows, setRows] = useState<PartnershipRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  
+  // Checkbox multi-select state
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Ref for save-on-unmount
@@ -696,10 +709,70 @@ export default function PartnershipTab({
 
   const deleteRow = async (index: number) => {
     const row = rows[index];
-    if (row.id) {
-      await onDelete('project', row.id);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Row',
+      message: 'Are you sure you want to delete this row? This action cannot be undone.',
+      onConfirm: async () => {
+        if (row.id) {
+          await onDelete('project', row.id);
+        }
+        setRows(prev => prev.filter((_, i) => i !== index));
+        // Remove from selection if selected
+        setSelectedRows(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(row.clientId);
+          return newSet;
+        });
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+      }
+    });
+  };
+  
+  // Bulk delete selected rows
+  const deleteBulk = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Selected Rows',
+      message: `Are you sure you want to delete ${selectedRows.size} selected row(s)? This action cannot be undone.`,
+      onConfirm: async () => {
+        const rowsToDelete = rows.filter(row => selectedRows.has(row.clientId));
+        
+        // Delete from backend
+        for (const row of rowsToDelete) {
+          if (row.id) {
+            await onDelete('project', row.id);
+          }
+        }
+        
+        // Remove from state
+        setRows(prev => prev.filter(row => !selectedRows.has(row.clientId)));
+        setSelectedRows(new Set());
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+      }
+    });
+  };
+  
+  // Toggle row selection
+  const toggleRowSelection = (clientId: string) => {
+    setSelectedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(clientId)) {
+        newSet.delete(clientId);
+      } else {
+        newSet.add(clientId);
+      }
+      return newSet;
+    });
+  };
+  
+  // Select/deselect all rows
+  const toggleSelectAll = () => {
+    if (selectedRows.size === rows.length) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(rows.map(row => row.clientId)));
     }
-    setRows(prev => prev.filter((_, i) => i !== index));
   };
 
   const handlePaste = (e: ClipboardEvent, rowIndex: number, colIndex: number) => {
@@ -957,6 +1030,16 @@ export default function PartnershipTab({
             className="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
           />
 
+          {selectedRows.size > 0 && (
+            <button
+              onClick={deleteBulk}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md transition-colors"
+            >
+              <Trash2 size={18} />
+              Delete Selected ({selectedRows.size})
+            </button>
+          )}
+          
           {/* Zoom Controls */}
           <div className="flex items-center gap-2">
             <button
@@ -1032,6 +1115,15 @@ export default function PartnershipTab({
                 <thead className="bg-blue-50 dark:bg-gray-900 sticky top-0 z-10">
                   <tr>
                     <th className="px-1 py-2 w-8"></th>
+                    <th className="px-2 py-2 w-8 text-center">
+                      <input
+                        type="checkbox"
+                        checked={rows.length > 0 && selectedRows.size === rows.length}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 cursor-pointer"
+                        title="Select all"
+                      />
+                    </th>
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 relative" style={{ width: columnWidths.code }}>
                       Code
                       <ResizeHandle column="code" onResizeStart={handleColumnResizeStart} />
@@ -1099,13 +1191,23 @@ export default function PartnershipTab({
                   <SortableContext items={filteredRows.map(r => r.clientId)} strategy={verticalListSortingStrategy}>
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={17} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={18} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                           No partnerships found. Click "Add Row" to create one.
                         </td>
                       </tr>
                     ) : (
                       filteredRows.map((row, idx) => (
                         <SortableRow key={row.clientId} id={row.clientId} className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${row.isDirty ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}`}>
+                          {/* Checkbox */}
+                          <td className="px-2 py-1 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedRows.has(row.clientId)}
+                              onChange={() => toggleRowSelection(row.clientId)}
+                              className="w-4 h-4 cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </td>
                           {/* Code (Read-Only) */}
                           <td className="px-2 py-1" style={{ width: columnWidths.code }}>
                             <div className="w-full px-2 py-1 text-xs text-gray-700 dark:text-gray-300">{row.code}</div>
@@ -1301,6 +1403,15 @@ export default function PartnershipTab({
           </div>
         </div>
       </div>
+      
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} })}
+      />
     </div>
   );
 }

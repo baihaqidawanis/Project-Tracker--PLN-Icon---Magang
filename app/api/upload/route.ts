@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
+import { uploadFile, generateUniqueFilename, getFileUrl } from '@/app/lib/s3';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,35 +22,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File too large. Maximum size is 10MB.' }, { status: 400 });
     }
 
-    // Create upload directory if it doesn't exist
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'evidence');
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
-
     // Generate unique filename
-    const timestamp = Date.now();
-    const fileExtension = path.extname(file.name);
-    const baseFilename = path.basename(file.name, fileExtension).replace(/[^a-zA-Z0-9]/g, '_');
-    const filename = `${baseFilename}_${timestamp}${fileExtension}`;
-    const filepath = path.join(uploadDir, filename);
+    const filename = generateUniqueFilename(file.name);
+    const s3Key = `evidence/${filename}`;
 
-    // Convert file to buffer and write
+    // Convert file to buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    await writeFile(filepath, buffer);
 
-    // Return the public URL path
-    const publicPath = `/uploads/evidence/${filename}`;
+    // Upload to S3/MinIO
+    await uploadFile(buffer, s3Key, file.type);
+
+    // Get presigned URL (expires in 7 days for evidence files)
+    const fileUrl = await getFileUrl(s3Key, 7 * 24 * 60 * 60);
 
     return NextResponse.json({ 
       success: true, 
       filename,
-      path: publicPath 
+      s3Key,
+      url: fileUrl,
+      message: 'File uploaded successfully'
     });
-
   } catch (error) {
     console.error('Upload error:', error);
-    return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to upload file',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
