@@ -21,6 +21,7 @@ interface DailyProgressTableProps {
   onColumnResizeStart: (e: React.MouseEvent, table: 'workflow' | 'progress', column: string) => void;
   onAddRow: () => void;
   onDelete: (index: number) => void;
+  onBulkDelete: (ids: number[]) => void;
   masterData: any;
   // Fill handle props
   isCellActive: (rowIndex: number, field: string, table: 'workflow' | 'progress') => boolean;
@@ -43,6 +44,7 @@ export default function DailyProgressTable({
   onColumnResizeStart,
   onAddRow,
   onDelete,
+  onBulkDelete,
   masterData,
   isCellActive,
   isCellInSelection,
@@ -53,20 +55,18 @@ export default function DailyProgressTable({
 }: DailyProgressTableProps) {
 
   const [internalRows, setInternalRows] = React.useState<ProgressRow[]>(progressRows);
+  const prevProgressRowsRef = React.useRef<ProgressRow[]>(progressRows);
   
   // Checkbox multi-select state
   const [selectedRows, setSelectedRows] = React.useState<Set<string>>(new Set());
 
-  // Sync internal state with parent
+  // Only sync when parent rows actually change (not from our own updates)
   React.useEffect(() => {
-    setInternalRows(progressRows);
-  }, [progressRows, setInternalRows]);
-
-  React.useEffect(() => {
-    if (JSON.stringify(internalRows) !== JSON.stringify(progressRows)) {
-      setProgressRows(internalRows);
+    if (progressRows !== prevProgressRowsRef.current) {
+      setInternalRows(progressRows);
+      prevProgressRowsRef.current = progressRows;
     }
-  }, [internalRows]);
+  }, [progressRows]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -79,24 +79,30 @@ export default function DailyProgressTable({
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    setInternalRows((items) => {
-      const oldIndex = items.findIndex((item) => item.clientId === active.id);
-      const newIndex = items.findIndex((item) => item.clientId === over.id);
+    const oldIndex = internalRows.findIndex((item) => item.clientId === active.id);
+    const newIndex = internalRows.findIndex((item) => item.clientId === over.id);
 
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newRows = arrayMove(items, oldIndex, newIndex);
-        return newRows.map((row, index) => ({ ...row, isDirty: true, sortOrder: index }));
-      }
-      return items;
-    });
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newRows = arrayMove(internalRows, oldIndex, newIndex);
+      const updatedRows = newRows.map((row, index) => ({ ...row, isDirty: true, sortOrder: index }));
+      
+      // Update local state
+      setInternalRows(updatedRows);
+      // Sync to parent for autosave
+      setProgressRows(updatedRows);
+      prevProgressRowsRef.current = updatedRows;
+    }
   };
 
   const updateCell = (index: number, field: keyof ProgressRow, value: any) => {
-    setInternalRows(prev => {
-      const newRows = [...prev];
-      newRows[index] = { ...newRows[index], [field]: value, isDirty: true };
-      return newRows;
-    });
+    const newRows = [...internalRows];
+    newRows[index] = { ...newRows[index], [field]: value, isDirty: true };
+    
+    // Update local state
+    setInternalRows(newRows);
+    // Sync to parent for autosave
+    setProgressRows(newRows);
+    prevProgressRowsRef.current = newRows;
   };
 
   // Toggle row selection
@@ -123,18 +129,15 @@ export default function DailyProgressTable({
 
   // Bulk delete selected rows
   const handleBulkDelete = () => {
-    // Get all selected row indices  
-    const indicesToDelete = internalRows
-      .map((row, idx) => selectedRows.has(row.clientId) ? idx : -1)
-      .filter(idx => idx !== -1)
-      .sort((a, b) => b - a); // Sort descending to delete from end
+    // Get IDs of selected rows
+    const idsToDelete = internalRows
+      .filter(row => selectedRows.has(row.clientId) && row.id)
+      .map(row => row.id!);
 
-    // Delete each row (from end to start to maintain indices)
-    for (const idx of indicesToDelete) {
-      onDelete(idx);
+    if (idsToDelete.length > 0) {
+      onBulkDelete(idsToDelete);
+      setSelectedRows(new Set());
     }
-
-    setSelectedRows(new Set());
   };
 
   const handlePaste = (e: ClipboardEvent, rowIndex: number, colIndex: number) => {

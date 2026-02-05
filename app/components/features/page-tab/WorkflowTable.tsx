@@ -22,6 +22,7 @@ interface WorkflowTableProps {
   onAddMain: () => void;
   onAddSub: () => void;
   onDelete: (index: number) => void;
+  onBulkDelete: (ids: number[]) => void;
   // Fill handle props
   isCellActive: (rowIndex: number, field: string, table: 'workflow' | 'progress') => boolean;
   isCellInSelection: (rowIndex: number, field: string, table: 'workflow' | 'progress') => boolean;
@@ -45,6 +46,7 @@ export default function WorkflowTable({
   onAddMain,
   onAddSub,
   onDelete,
+  onBulkDelete,
   isCellActive,
   isCellInSelection,
   handleCellFocus,
@@ -54,20 +56,18 @@ export default function WorkflowTable({
 }: WorkflowTableProps) {
 
   const [internalRows, setInternalRows] = React.useState<WorkflowRow[]>(workflowRows);
+  const prevWorkflowRowsRef = React.useRef<WorkflowRow[]>(workflowRows);
   
   // Checkbox multi-select state
   const [selectedRows, setSelectedRows] = React.useState<Set<string>>(new Set());
 
-  // Sync internal state with parent
+  // Only sync when parent rows actually change (not from our own updates)
   React.useEffect(() => {
-    setInternalRows(workflowRows);
-  }, [workflowRows, setInternalRows]);
-
-  React.useEffect(() => {
-    if (JSON.stringify(internalRows) !== JSON.stringify(workflowRows)) {
-      setWorkflowRows(internalRows);
+    if (workflowRows !== prevWorkflowRowsRef.current) {
+      setInternalRows(workflowRows);
+      prevWorkflowRowsRef.current = workflowRows;
     }
-  }, [internalRows]);
+  }, [workflowRows]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -80,37 +80,43 @@ export default function WorkflowTable({
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    setInternalRows((items) => {
-      const oldIndex = items.findIndex((item) => item.clientId === active.id);
-      const newIndex = items.findIndex((item) => item.clientId === over.id);
+    const oldIndex = internalRows.findIndex((item) => item.clientId === active.id);
+    const newIndex = internalRows.findIndex((item) => item.clientId === over.id);
 
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newRows = arrayMove(items, oldIndex, newIndex);
-        return newRows.map((row, index) => ({ ...row, isDirty: true, sortOrder: index }));
-      }
-      return items;
-    });
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newRows = arrayMove(internalRows, oldIndex, newIndex);
+      const updatedRows = newRows.map((row, index) => ({ ...row, isDirty: true, sortOrder: index }));
+      
+      // Update local state
+      setInternalRows(updatedRows);
+      // Sync to parent for autosave
+      setWorkflowRows(updatedRows);
+      prevWorkflowRowsRef.current = updatedRows;
+    }
   };
 
   const updateCell = (index: number, field: keyof WorkflowRow, value: any) => {
-    setInternalRows(prev => {
-      const newRows = [...prev];
-      const currentRow = { ...newRows[index], [field]: value, isDirty: true };
+    const newRows = [...internalRows];
+    const currentRow = { ...newRows[index], [field]: value, isDirty: true };
 
-      if (currentRow.type === 'sub' && (field === 'status' || field === 'bobot')) {
-        const currentStatus = field === 'status' ? value : currentRow.status;
-        const currentBobot = field === 'bobot' ? value : currentRow.bobot;
+    if (currentRow.type === 'sub' && (field === 'status' || field === 'bobot')) {
+      const currentStatus = field === 'status' ? value : currentRow.status;
+      const currentBobot = field === 'bobot' ? value : currentRow.bobot;
 
-        if (currentStatus === 'Done') {
-          currentRow.progress = currentBobot;
-        } else {
-          currentRow.progress = 0;
-        }
+      if (currentStatus === 'Done') {
+        currentRow.progress = currentBobot;
+      } else {
+        currentRow.progress = 0;
       }
+    }
 
-      newRows[index] = currentRow;
-      return newRows;
-    });
+    newRows[index] = currentRow;
+    
+    // Update local state
+    setInternalRows(newRows);
+    // Sync to parent for autosave
+    setWorkflowRows(newRows);
+    prevWorkflowRowsRef.current = newRows;
   };
 
   // Toggle row selection
@@ -137,18 +143,15 @@ export default function WorkflowTable({
 
   // Bulk delete selected rows
   const handleBulkDelete = () => {
-    // Get all selected row indices
-    const indicesToDelete = internalRows
-      .map((row, idx) => selectedRows.has(row.clientId) ? idx : -1)
-      .filter(idx => idx !== -1)
-      .sort((a, b) => b - a); // Sort descending to delete from end
+    // Get IDs of selected rows
+    const idsToDelete = internalRows
+      .filter(row => selectedRows.has(row.clientId) && row.id)
+      .map(row => row.id!);
 
-    // Delete each row (from end to start to maintain indices)
-    for (const idx of indicesToDelete) {
-      onDelete(idx);
+    if (idsToDelete.length > 0) {
+      onBulkDelete(idsToDelete);
+      setSelectedRows(new Set());
     }
-
-    setSelectedRows(new Set());
   };
 
   const handlePaste = (e: ClipboardEvent, rowIndex: number, colIndex: number) => {

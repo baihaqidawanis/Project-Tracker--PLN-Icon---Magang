@@ -315,13 +315,17 @@ export default function ProjectTracker() {
         await fetch(`/api/pages?id=${id}`, { method: 'DELETE' });
       } else if (type === 'workflow') {
         await fetch(`/api/workflows?id=${id}`, { method: 'DELETE' });
-      } else if (type === 'progress') {
+      } else if (type === 'dailyProgress') {
         await fetch(`/api/daily-progress?id=${id}`, { method: 'DELETE' });
       } else if (type === 'pkr-opex') {
         await fetch(`/api/pkr-opex?id=${id}`, { method: 'DELETE' });
       }
 
-      await fetchAllData();
+      // Only refresh data for types that affect global state (project/page)
+      // For workflow/dailyProgress, let optimistic update in PageTab handle it
+      if (type === 'project' || type === 'page' || type === 'pkr-opex') {
+        await fetchAllData();
+      }
     } catch (error) {
       console.error('Error deleting data:', error);
       alert('Error deleting data. Please try again.');

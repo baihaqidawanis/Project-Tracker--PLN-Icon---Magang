@@ -41,7 +41,11 @@ export function useAutoSave({
   }, [selectedPageId]);
 
   const saveDirtyRows = async () => {
-    if (!selectedPageId) return;
+    if (!selectedPageId) {
+      console.log('[AutoSave] No selectedPageId, skipping');
+      return;
+    }
+    console.log('[AutoSave] Starting save, pageId:', selectedPageId);
     setSaveStatus('saving');
 
     try {
@@ -57,6 +61,7 @@ export function useAutoSave({
           const { isNew, isDirty, type, clientId, ...rowPayload } = row;
           const body = { ...rowPayload, pageId: selectedPageId, sortOrder: i };
 
+          console.log('[AutoSave] Saving workflow:', method, body);
           const res = await fetch('/api/workflows', {
             method,
             headers: { 'Content-Type': 'application/json' },
@@ -65,6 +70,7 @@ export function useAutoSave({
 
           if (res.ok) {
             const savedData = await res.json();
+            console.log('[AutoSave] Workflow saved:', savedData);
             updatedWorkflows[i] = {
               ...updatedWorkflows[i],
               id: savedData.id || row.id,
@@ -72,6 +78,8 @@ export function useAutoSave({
               isNew: false,
               isDirty: false
             };
+          } else {
+            console.error('[AutoSave] Workflow save failed:', res.status, await res.text());
           }
         }
       }
@@ -125,8 +133,11 @@ export function useAutoSave({
   useEffect(() => {
     const hasDirtyWorkflow = workflowRows.some(r => r.isDirty);
     const hasDirtyProgress = progressRows.some(r => r.isDirty);
+    
+    console.log('[AutoSave Trigger] workflows:', workflowRows.length, 'dirty:', hasDirtyWorkflow, 'progress:', progressRows.length, 'dirty:', hasDirtyProgress, 'pageId:', selectedPageId);
 
     if ((hasDirtyWorkflow || hasDirtyProgress) && selectedPageId) {
+      console.log('[AutoSave Trigger] Will save in 500ms');
       setSaveStatus('saving');
 
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);

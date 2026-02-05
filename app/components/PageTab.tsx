@@ -264,8 +264,27 @@ export default function PageTab({
       onConfirm: async () => {
         if (row.id) {
           await onDelete('workflow', row.id);
+          // Update parent state
+          setWorkflows(prev => prev.filter(w => w.id !== row.id));
         }
         setWorkflowRows(prev => prev.filter((_, i) => i !== index));
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+      }
+    });
+  };
+
+  const bulkDeleteWorkflows = async (ids: number[]) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Workflows',
+      message: `Are you sure you want to delete ${ids.length} workflow(s)? This action cannot be undone.`,
+      onConfirm: async () => {
+        // Delete from API
+        await Promise.all(ids.map(id => onDelete('workflow', id)));
+        // Remove from local state
+        setWorkflowRows(prev => prev.filter(row => !ids.includes(row.id!)));
+        // Update parent state to prevent reload
+        setWorkflows(prev => prev.filter(w => !ids.includes(w.id)));
         setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
       }
     });
@@ -298,6 +317,8 @@ export default function PageTab({
       onConfirm: async () => {
         if (row.id) {
           await onDelete('dailyProgress', row.id);
+          // Update parent state
+          setDailyProgress(prev => prev.filter(p => p.id !== row.id));
         }
         setProgressRows(prev => prev.filter((_, i) => i !== index));
         setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
@@ -305,54 +326,78 @@ export default function PageTab({
     });
   };
 
+  const bulkDeleteProgress = async (ids: number[]) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Daily Progress',
+      message: `Are you sure you want to delete ${ids.length} progress row(s)? This action cannot be undone.`,
+      onConfirm: async () => {
+        // Delete from API
+        await Promise.all(ids.map(id => onDelete('dailyProgress', id)));
+        // Remove from local state
+        setProgressRows(prev => prev.filter(row => !ids.includes(row.id!)));
+        // Update parent state to prevent reload
+        setDailyProgress(prev => prev.filter(p => !ids.includes(p.id)));
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+      }
+    });
+  };
+
   // --- SELECTION & LOAD ---
   useEffect(() => {
-    if (Array.isArray(pages) && pages.length > 0 && !selectedPageId) {
+    if (!Array.isArray(pages) || pages.length === 0) {
+      setPreviousPagesLength(0);
+      return;
+    }
+    
+    // Check if currently selected page still exists
+    const currentPageExists = selectedPageId !== null && pages.some(p => p.id === selectedPageId);
+    
+    if (!currentPageExists) {
+      // Either no selection or current page was deleted - select first page
       setSelectedPageId(pages[0].id);
-    } else if (Array.isArray(pages) && pages.length !== previousPagesLength) {
-      if (selectedPageId && !pages.find(p => p.id === selectedPageId)) {
-        // Find closest page: try next page, then previous, then first
-        const currentIndex = pages.findIndex(p => p.id === selectedPageId);
-        const nextPage = pages[currentIndex] || pages[currentIndex - 1] || pages[0];
-        setSelectedPageId(nextPage ? nextPage.id : null);
-      }
+    }
+    
+    // Update pages length tracker
+    if (pages.length !== previousPagesLength) {
       setPreviousPagesLength(pages.length);
     }
-  }, [pages, selectedPageId, previousPagesLength]);
+  }, [pages]); // Only depend on pages array!
 
   const selectedPage = Array.isArray(pages) ? pages.find(p => p.id === selectedPageId) : undefined;
 
-  // Load workflows and progress from props filtered by selectedPageId
+  // Load workflows and progress from props ONLY when selectedPageId changes
+  // Don't depend on workflows/dailyProgress to avoid reload when autosave updates them
   useEffect(() => {
-    if (selectedPageId) {
-      const pageWorkflows = workflows
-        .filter(w => w.pageId === selectedPageId)
-        .map((w: any, index: number) => ({
-          ...w,
-          clientId: w.id ? w.id.toString() : `temp-${index}`,
-          type: w.no ? 'main' : 'sub',
-          isDirty: false,
-          isNew: false
-        }));
-
-      setWorkflowRows(pageWorkflows);
-
-      const pageProgress = dailyProgress
-        .filter(p => p.pageId === selectedPageId)
-        .map((p: any, index: number) => ({
-          ...p,
-          clientId: p.id ? p.id.toString() : `temp-${index}`,
-          date: p.date || '',
-          isDirty: false,
-          isNew: false
-        }));
-
-      setProgressRows(pageProgress);
-    } else {
+    if (!selectedPageId) {
       setWorkflowRows([]);
       setProgressRows([]);
+      return;
     }
-  }, [selectedPageId, workflows, dailyProgress]);
+
+    const pageWorkflows = workflows
+      .filter(w => w.pageId === selectedPageId)
+      .map((w: any, index: number) => ({
+        ...w,
+        clientId: w.id ? w.id.toString() : `temp-${index}`,
+        type: w.no ? 'main' : 'sub',
+        isDirty: false,
+        isNew: false
+      }));
+
+    const pageProgress = dailyProgress
+      .filter(p => p.pageId === selectedPageId)
+      .map((p: any, index: number) => ({
+        ...p,
+        clientId: p.id ? p.id.toString() : `temp-${index}`,
+        date: p.date || '',
+        isDirty: false,
+        isNew: false
+      }));
+
+    setWorkflowRows(pageWorkflows);
+    setProgressRows(pageProgress);
+  }, [selectedPageId]); // ONLY selectedPageId - don't reload when props update!
 
   const pageOptions = Array.isArray(pages)
     ? pages.map(page => ({
@@ -452,6 +497,7 @@ export default function PageTab({
                 onAddMain={addWorkflowMain}
                 onAddSub={addWorkflowSub}
                 onDelete={deleteWorkflowRow}
+                onBulkDelete={bulkDeleteWorkflows}
                 isCellActive={isCellActive}
                 isCellInSelection={isCellInSelection}
                 handleCellFocus={handleCellFocus}
@@ -475,6 +521,7 @@ export default function PageTab({
                 onColumnResizeStart={handleColumnResizeStart}
                 onAddRow={addProgressRow}
                 onDelete={deleteProgressRow}
+                onBulkDelete={bulkDeleteProgress}
                 masterData={masterData}
                 isCellActive={isCellActive}
                 isCellInSelection={isCellInSelection}
