@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployment
-  output: 'standalone',
+  // Uncomment for Docker build, comment out for local pnpm start
+  output: process.env.DOCKER_BUILD === 'true' ? 'standalone' : undefined,
   
   // Optimize images for production
   images: {

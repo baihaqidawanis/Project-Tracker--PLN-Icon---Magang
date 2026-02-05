@@ -311,7 +311,10 @@ export default function PageTab({
       setSelectedPageId(pages[0].id);
     } else if (Array.isArray(pages) && pages.length !== previousPagesLength) {
       if (selectedPageId && !pages.find(p => p.id === selectedPageId)) {
-        setSelectedPageId(pages.length > 0 ? pages[0].id : null);
+        // Find closest page: try next page, then previous, then first
+        const currentIndex = pages.findIndex(p => p.id === selectedPageId);
+        const nextPage = pages[currentIndex] || pages[currentIndex - 1] || pages[0];
+        setSelectedPageId(nextPage ? nextPage.id : null);
       }
       setPreviousPagesLength(pages.length);
     }

@@ -137,14 +137,16 @@ export default function WorkflowTable({
 
   // Bulk delete selected rows
   const handleBulkDelete = () => {
+    // Get all selected row indices
     const indicesToDelete = internalRows
       .map((row, idx) => selectedRows.has(row.clientId) ? idx : -1)
       .filter(idx => idx !== -1)
-      .reverse(); // Delete from end to start to maintain indices
+      .sort((a, b) => b - a); // Sort descending to delete from end
 
-    indicesToDelete.forEach(idx => {
+    // Delete each row (from end to start to maintain indices)
+    for (const idx of indicesToDelete) {
       onDelete(idx);
-    });
+    }
 
     setSelectedRows(new Set());
   };

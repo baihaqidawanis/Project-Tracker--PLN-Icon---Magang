@@ -21,6 +21,7 @@ COPY . .
 # Set environment to production
 ENV NEXT_TELEMETRY_DISABLED 1
 ENV NODE_ENV production
+ENV DOCKER_BUILD true
 
 # Generate Prisma Client
 RUN npx prisma generate
