@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Moon, Sun, Menu, LogOut, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { Moon, Sun, Menu, LogOut, User, Loader2 } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 
 interface HeaderProps {
@@ -14,9 +14,15 @@ interface HeaderProps {
 
 export default function Header({ darkMode, setDarkMode, sidebarCollapsed, setSidebarCollapsed, setActiveTab }: HeaderProps) {
   const { data: session } = useSession();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: '/login' });
+    setIsLoggingOut(true);
+    try {
+      await signOut({ callbackUrl: '/login', redirect: true });
+    } catch (error) {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -31,7 +37,7 @@ export default function Header({ darkMode, setDarkMode, sidebarCollapsed, setSid
             >
               <Menu size={20} />
             </button>
-            <img src="/image.png" alt="PLN Icon Plus" className="w-10 h-10 rounded-lg" />
+            <img src="/image.png" alt="PLN Icon Plus" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
             <div>
               <h1 className="text-xl font-bold text-white leading-tight">PLN Icon Plus</h1>
               <p
@@ -57,11 +63,18 @@ export default function Header({ darkMode, setDarkMode, sidebarCollapsed, setSid
             {/* Logout Button */}
             <button
               onClick={handleLogout}
-              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center gap-2"
+              disabled={isLoggingOut}
+              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
               title="Logout"
             >
-              <LogOut size={18} />
-              <span className="hidden sm:inline text-sm font-medium">Logout</span>
+              {isLoggingOut ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <LogOut size={18} />
+              )}
+              <span className="hidden sm:inline text-sm font-medium">
+                {isLoggingOut ? 'Logging out...' : 'Logout'}
+              </span>
             </button>
           </div>
         </div>

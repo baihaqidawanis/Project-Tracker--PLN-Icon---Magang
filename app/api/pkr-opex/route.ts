@@ -21,9 +21,16 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const data = await request.json();
+    
+    // Validate date - if empty or invalid, use current date
+    const dateValue = data.date && data.date !== '' ? new Date(data.date) : new Date();
+    if (isNaN(dateValue.getTime())) {
+      return NextResponse.json({ error: 'Invalid date provided' }, { status: 400 });
+    }
+    
     const pkr = await prisma.pKROpex.create({
       data: {
-        date: new Date(data.date),
+        date: dateValue,
         mitra: data.mitra,
         description: data.description,
         saldoTopUp: data.saldoTopUp ? parseFloat(data.saldoTopUp) : null,

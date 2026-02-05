@@ -7,8 +7,8 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   
-  // Maximum time one test can run for
-  timeout: 30 * 1000,
+  // Maximum time one test can run for - increased for dev mode with compilation
+  timeout: 60 * 1000, // 60 seconds per test
   
   // Test artifacts
   outputDir: 'test-results/',
@@ -22,8 +22,8 @@ export default defineConfig({
   // Retry on CI only
   retries: process.env.CI ? 2 : 0,
   
-  // Opt out of parallel tests on CI
-  workers: process.env.CI ? 1 : undefined,
+  // Reduce parallel workers to avoid overwhelming Next.js dev server
+  workers: process.env.CI ? 1 : 4, // 4 workers instead of 8 for better stability
   
   // Reporter to use
   reporter: [
