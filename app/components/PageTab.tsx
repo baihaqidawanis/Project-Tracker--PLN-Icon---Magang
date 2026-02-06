@@ -360,8 +360,21 @@ export default function PageTab({
       return;
     }
 
-    // 1. If we already have a valid selection, keep it
+    // 1. If we already have a valid selection, keep it (Unless a NEW page was just added)
     const isCurrentValid = selectedPageId !== null && pages.some(p => p.id === selectedPageId);
+
+    // UX: Auto-switch to new page if one was added (detect length increase)
+    // Only applies if not initial load (previous > 0)
+    if (previousPagesLength > 0 && pages.length > previousPagesLength) {
+      const newestPage = [...pages].sort((a, b) => b.id - a.id)[0];
+      if (newestPage && newestPage.id !== selectedPageId) {
+        console.log('Auto-switching to new page:', newestPage.id);
+        setSelectedPageId(newestPage.id);
+        setPreviousPagesLength(pages.length);
+        return;
+      }
+    }
+
     if (isCurrentValid) {
       // Just update length tracker
       if (pages.length !== previousPagesLength) {

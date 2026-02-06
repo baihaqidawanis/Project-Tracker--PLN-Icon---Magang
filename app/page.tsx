@@ -19,7 +19,7 @@ type FullScreenMode = 'none' | 'workflow' | 'progress' | 'both';
 export default function ProjectTracker() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  
+
   // ALL STATE DECLARATIONS MUST BE AT THE TOP - Before any conditionals or returns
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -48,9 +48,9 @@ export default function ProjectTracker() {
 
   // Full-screen state
   const [fullScreenMode, setFullScreenMode] = useState<FullScreenMode>('none');
-  
+
   // ALL useEffect HOOKS - Must be declared before any conditional returns
-  
+
   // Redirect to login if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -370,66 +370,66 @@ export default function ProjectTracker() {
             }`}
         >
           <div className="px-4 sm:px-6 lg:px-8 py-8">
-            {loading && activeTab !== 'master' ? (
-              <div className="flex justify-center items-center h-64">
-                <Loader2 className="animate-spin text-blue-600 dark:text-blue-400" size={48} />
-              </div>
-            ) : (
-              <>
-                {activeTab === 'pivot' && (
-                  <PivotTab projects={projects} masterData={masterData} />
-                )}
+            <>
+              {loading && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
+                  <Loader2 className="animate-spin text-blue-600 dark:text-blue-400" size={48} />
+                </div>
+              )}
 
-                {activeTab === 'report' && (
-                  <ReportTab projects={projects} masterData={masterData} />
-                )}
+              {activeTab === 'pivot' && (
+                <PivotTab projects={projects} masterData={masterData} />
+              )}
 
-                {activeTab === 'partnership' && (
-                  <PartnershipTab
-                    projects={projects}
-                    setProjects={setProjects}
-                    masterData={masterData}
-                    loading={loading}
-                    onOpenModal={openModal}
-                    onDelete={handleDelete}
-                    pages={pages}
-                    workflows={workflows}
-                    dailyProgress={dailyProgress}
-                  />
-                )}
+              {activeTab === 'report' && (
+                <ReportTab projects={projects} masterData={masterData} />
+              )}
 
-                {activeTab === 'page' && (
-                  <PageTab
-                    pages={pages}
-                    setPages={setPages}
-                    workflows={workflows}
-                    setWorkflows={setWorkflows}
-                    dailyProgress={dailyProgress}
-                    setDailyProgress={setDailyProgress}
-                    masterData={masterData}
-                    fullScreenMode={fullScreenMode}
-                    setFullScreenMode={setFullScreenMode}
-                    onOpenModal={openModal}
-                    onDelete={handleDelete}
-                    onSyncBeforeUnmount={handlePageTabSync}
-                  />
-                )}
+              {activeTab === 'partnership' && (
+                <PartnershipTab
+                  projects={projects}
+                  setProjects={setProjects}
+                  masterData={masterData}
+                  loading={loading}
+                  onOpenModal={openModal}
+                  onDelete={handleDelete}
+                  pages={pages}
+                  workflows={workflows}
+                  dailyProgress={dailyProgress}
+                />
+              )}
 
-                {activeTab === 'master' && (
-                  <MasterTab masterData={masterData} onRefresh={fetchAllData} />
-                )}
+              {activeTab === 'page' && (
+                <PageTab
+                  pages={pages}
+                  setPages={setPages}
+                  workflows={workflows}
+                  setWorkflows={setWorkflows}
+                  dailyProgress={dailyProgress}
+                  setDailyProgress={setDailyProgress}
+                  masterData={masterData}
+                  fullScreenMode={fullScreenMode}
+                  setFullScreenMode={setFullScreenMode}
+                  onOpenModal={openModal}
+                  onDelete={handleDelete}
+                  onSyncBeforeUnmount={handlePageTabSync}
+                />
+              )}
 
-                {activeTab === 'pkr-opex' && (
-                  <PKROpexTab
-                    pkrOpex={pkrOpex}
-                    setPkrOpex={setPkrOpex}
-                    loading={loading}
-                    onOpenModal={openModal}
-                    onDelete={handleDelete}
-                  />
-                )}
-              </>
-            )}
+              {activeTab === 'master' && (
+                <MasterTab masterData={masterData} onRefresh={fetchAllData} />
+              )}
+
+              {activeTab === 'pkr-opex' && (
+                <PKROpexTab
+                  pkrOpex={pkrOpex}
+                  setPkrOpex={setPkrOpex}
+                  loading={loading}
+                  onOpenModal={openModal}
+                  onDelete={handleDelete}
+                />
+              )}
+            </>
           </div>
         </div>
 

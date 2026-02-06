@@ -24,6 +24,30 @@ Copy-Item .env.production.example .env  # Edit values
 
 ---
 
+## 🐳 Docker Deployment & Seeding (Specific for DevOps)
+
+For manual Docker setup or troubleshooting, follow these specific seeding steps:
+
+1. **Build & Start Containers:**
+   ```bash
+   docker compose up -d --build
+   ```
+
+2. **🌱 Seeding Master Data (MANDATORY):**
+   Run this command explicitly to populate Master Data (Branch, Status, etc). **The app will not function correctly without this.**
+   ```bash
+   docker exec plnprojecttracker-app node prisma/seed.js
+   ```
+
+3. **👤 Create First Admin (Optional):**
+   If you need to create an initial admin account manually:
+   ```bash
+   # Usage: node scripts/create-admin.js <email> <password> <name>
+   docker exec plnprojecttracker-app node scripts/create-admin.js admin@plniconplus.com admin123 "Admin User"
+   ```
+
+---
+
 ## ✨ Features
 
 - 📊 Multi-tab project tracking (Partnership, Page, PKR Opex, Master)
