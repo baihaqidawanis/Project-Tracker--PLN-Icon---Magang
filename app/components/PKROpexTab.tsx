@@ -163,17 +163,17 @@ export default function PKROpexTab({
 
   const [rows, setRows] = useState<PKROpexRow[]>([]);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
-  
+
   // Checkbox multi-select state
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-  
+
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
     message: string;
     onConfirm: () => void;
-  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
 
   // Ref for save-on-unmount
   const rowsRef = useRef(rows);
@@ -468,12 +468,12 @@ export default function PKROpexTab({
       const pathParts = urlObj.pathname.split('/').filter(p => p); // Remove empty strings
       // pathParts = ['plnprojecttracker', 'evidence', 'filename.ext']
       const s3Key = pathParts.slice(1).join('/'); // Skip bucket name, get 'evidence/filename.ext'
-      
+
       if (!s3Key) {
         alert('Invalid file URL');
         return;
       }
-      
+
       const response = await fetch(`/api/upload/${encodeURIComponent(s3Key)}`, {
         method: 'DELETE',
       });
@@ -527,11 +527,11 @@ export default function PKROpexTab({
           newSet.delete(row.clientId);
           return newSet;
         });
-        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } });
       }
     });
   };
-  
+
   // Bulk delete selected rows
   const deleteBulk = () => {
     setConfirmDialog({
@@ -540,22 +540,22 @@ export default function PKROpexTab({
       message: `Are you sure you want to delete ${selectedRows.size} selected row(s)? This action cannot be undone.`,
       onConfirm: async () => {
         const rowsToDelete = rows.filter(row => selectedRows.has(row.clientId));
-        
+
         // Delete from backend
         for (const row of rowsToDelete) {
           if (row.id) {
             await onDelete('pkr-opex', row.id);
           }
         }
-        
+
         // Remove from state
         setRows(prev => prev.filter(row => !selectedRows.has(row.clientId)));
         setSelectedRows(new Set());
-        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } });
       }
     });
   };
-  
+
   // Toggle row selection
   const toggleRowSelection = (clientId: string) => {
     setSelectedRows(prev => {
@@ -568,7 +568,7 @@ export default function PKROpexTab({
       return newSet;
     });
   };
-  
+
   // Select/deselect all rows
   const toggleSelectAll = () => {
     if (selectedRows.size === rows.length) {
@@ -783,7 +783,7 @@ export default function PKROpexTab({
                 Delete Selected ({selectedRows.size})
               </button>
             )}
-            
+
             {/* Zoom Controls */}
             <div className="flex items-center gap-2 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600">
               <button
@@ -1029,21 +1029,21 @@ export default function PKROpexTab({
                                     }}
                                   />
                                 </label>
-                                
+
                                 {/* Show filename/preview if evidence exists */}
                                 {row.evidence && (
                                   <>
                                     {/* View/Download button */}
-                                    <a 
-                                      href={row.evidence} 
-                                      target="_blank" 
+                                    <a
+                                      href={row.evidence}
+                                      target="_blank"
                                       rel="noopener noreferrer"
                                       className="flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs"
                                       title="View file"
                                     >
                                       <Eye className="w-3 h-3" />
                                     </a>
-                                    
+
                                     {/* Delete button */}
                                     <button
                                       onClick={() => handleFileDelete(idx, row.evidence)}
@@ -1052,7 +1052,7 @@ export default function PKROpexTab({
                                     >
                                       <X className="w-3 h-3" />
                                     </button>
-                                    
+
                                     {/* Show filename */}
                                     <span className="text-xs truncate flex-1 dark:text-gray-300" title={row.evidence}>
                                       {row.evidence.split('/').pop()}
@@ -1103,7 +1103,7 @@ export default function PKROpexTab({
           </div>
         </div>
       </div>
-      
+
       {/* Confirmation Dialog */}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
@@ -1113,7 +1113,7 @@ export default function PKROpexTab({
         cancelText="Cancel"
         confirmButtonClass="bg-red-600 hover:bg-red-700"
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} })}
+        onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } })}
       />
     </div>
   );

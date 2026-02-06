@@ -42,59 +42,64 @@ model MasterStatus {
 }
 
 model MasterKode {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model MasterBnP {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model MasterSO {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model MasterActivityType {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Main Project Table (Partnership)
 model Project {
-  id                      Int            @id @default(autoincrement())
-  code                    String         @unique
-  kode                    String?
-  branchId                Int?
-  branch                  MasterBranch?  @relation(fields: [branchId], references: [id])
-  namaCalonMitra          String
-  prioritasId             Int?
-  prioritas               MasterPrioritas? @relation(fields: [prioritasId], references: [id])
-  picId                   Int?
-  pic                     MasterPIC?     @relation(fields: [picId], references: [id])
-  jenisKerjaSama          String?
-  progressPercentage      Int            @default(0)
-  latestDateUpdated       DateTime?
-  latestUpdate            String?
-  actionPlan              String?
-  targetDate              DateTime?
-  linkDokumen             String?
-  latestActivity          String?
-  latestActivityStatusId  Int?
-  latestActivityStatus    MasterStatus?  @relation(fields: [latestActivityStatusId], references: [id])
-  sortOrder               Int            @default(0)
-  lastEditedBy            String?        // Email of last editor for audit
-  createdAt               DateTime       @default(now())
-  updatedAt               DateTime       @updatedAt
+  id                     Int              @id @default(autoincrement())
+  code                   String           @unique
+  kode                   String?
+  branchId               Int?
+  branch                 MasterBranch?    @relation(fields: [branchId], references: [id])
+  namaCalonMitra         String
+  prioritasId            Int?
+  prioritas              MasterPrioritas? @relation(fields: [prioritasId], references: [id])
+  picId                  Int?
+  pic                    MasterPIC?       @relation(fields: [picId], references: [id])
+  jenisKerjaSama         String?
+  progressPercentage     Int              @default(0)
+  latestDateUpdated      DateTime?
+  latestUpdate           String?
+  actionPlan             String?
+  targetDate             DateTime?
+  linkDokumen            String?
+  latestActivity         String?
+  latestActivityStatusId Int?
+  latestActivityStatus   MasterStatus?    @relation(fields: [latestActivityStatusId], references: [id])
+  sortOrder              Int              @default(0)
+  lastEditedBy           String? // Email of last editor for audit
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  @@index([sortOrder])
+  @@index([branchId])
+  @@index([prioritasId])
+  @@index([picId])
 }
 
 // Page Model (P.01, P.02, etc)
@@ -110,62 +115,73 @@ model Page {
 
 // Workflow Table
 model Workflow {
-  id         Int      @id @default(autoincrement())
-  pageId     Int
-  page       Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  no         Int      @default(0)
-  activity   String
-  bobot      Int      @default(0)
-  target     String?
-  status     String?
-  progress   Int      @default(0)
-  sortOrder  Int      @default(0)
+  id           Int      @id @default(autoincrement())
+  pageId       Int
+  page         Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  no           Int      @default(0)
+  activity     String
+  bobot        Int      @default(0)
+  target       String?
+  status       String?
+  progress     Int      @default(0)
+  sortOrder    Int      @default(0)
   lastEditedBy String? // Email of last editor for audit
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([pageId])
+  @@index([sortOrder])
 }
 
 // Daily Progress Table
 model DailyProgress {
-  id            Int       @id @default(autoincrement())
-  pageId        Int
-  page          Page      @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  date          DateTime?
-  activityType  String
-  description   String
-  targetIfPlan  DateTime?
-  pic           String
-  category      String?
-  sortOrder     Int       @default(0)
-  lastEditedBy  String?   // Email of last editor for audit
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           Int       @id @default(autoincrement())
+  pageId       Int
+  page         Page      @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  date         DateTime?
+  activityType String
+  description  String
+  targetIfPlan DateTime?
+  pic          String
+  category     String?
+  sortOrder    Int       @default(0)
+  lastEditedBy String? // Email of last editor for audit
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([pageId])
+  @@index([sortOrder])
+  @@index([date])
 }
 
 // PKR Opex Table
 model PKROpex {
-  id              Int      @id @default(autoincrement())
-  date            DateTime
-  mitra           String
-  description     String
-  saldoTopUp      Decimal? @db.Decimal(15, 2)
-  saldoPRK        Decimal? @db.Decimal(15, 2)
-  evidence        String?
-  pic             String
-  sortOrder       Int      @default(0)
-  lastEditedBy    String?  // Email of last editor for audit
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  date         DateTime
+  mitra        String
+  description  String
+  saldoTopUp   Decimal? @db.Decimal(15, 2)
+  saldoPRK     Decimal? @db.Decimal(15, 2)
+  evidence     String?
+  pic          String
+  sortOrder    Int      @default(0)
+  lastEditedBy String? // Email of last editor for audit
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([sortOrder])
+  @@index([date])
 }
+
 // User Authentication (NextAuth compatible)
 model User {
-  id            String    @id @default(cuid())
-  name          String
-  email         String    @unique
-  password      String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  password  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  sessions  Session[]
 }
 
 model Session {

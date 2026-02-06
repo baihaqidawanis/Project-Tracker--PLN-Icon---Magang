@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '@/app/lib/prisma';
 
 // GET all PKR Opex
 export async function GET() {
@@ -21,13 +19,13 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    
+
     // Validate date - if empty or invalid, use current date
     const dateValue = data.date && data.date !== '' ? new Date(data.date) : new Date();
     if (isNaN(dateValue.getTime())) {
       return NextResponse.json({ error: 'Invalid date provided' }, { status: 400 });
     }
-    
+
     const pkr = await prisma.pKROpex.create({
       data: {
         date: dateValue,
@@ -58,11 +56,11 @@ export async function PUT(request: Request) {
         where: { id: parseInt(data.id) },
         select: { updatedAt: true }
       });
-      
+
       if (current && new Date(current.updatedAt).getTime() > new Date(data.lastSeenUpdatedAt).getTime()) {
-        return NextResponse.json({ 
-          error: 'conflict', 
-          message: 'Data sudah diupdate oleh user lain. Refresh untuk melihat perubahan terbaru.' 
+        return NextResponse.json({
+          error: 'conflict',
+          message: 'Data sudah diupdate oleh user lain. Refresh untuk melihat perubahan terbaru.'
         }, { status: 409 });
       }
     }
