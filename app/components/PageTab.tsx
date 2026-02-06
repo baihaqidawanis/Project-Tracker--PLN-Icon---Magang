@@ -107,7 +107,7 @@ export default function PageTab({
     title: string;
     message: string;
     onConfirm: () => void;
-  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
 
   // Auto-Save Hook
   const { saveStatus } = useAutoSave({
@@ -154,7 +154,7 @@ export default function PageTab({
     window.addEventListener('mousedown', handleGlobalClick);
     window.addEventListener('mouseup', handleMouseUp);
     window.addEventListener('mousemove', handleGlobalMouseMove);
-    
+
     return () => {
       window.removeEventListener('mousedown', handleGlobalClick);
       window.removeEventListener('mouseup', handleMouseUp);
@@ -268,7 +268,7 @@ export default function PageTab({
           setWorkflows(prev => prev.filter(w => w.id !== row.id));
         }
         setWorkflowRows(prev => prev.filter((_, i) => i !== index));
-        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } });
       }
     });
   };
@@ -285,7 +285,7 @@ export default function PageTab({
         setWorkflowRows(prev => prev.filter(row => !ids.includes(row.id!)));
         // Update parent state to prevent reload
         setWorkflows(prev => prev.filter(w => !ids.includes(w.id)));
-        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } });
       }
     });
   };
@@ -321,7 +321,7 @@ export default function PageTab({
           setDailyProgress(prev => prev.filter(p => p.id !== row.id));
         }
         setProgressRows(prev => prev.filter((_, i) => i !== index));
-        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } });
       }
     });
   };
@@ -338,31 +338,55 @@ export default function PageTab({
         setProgressRows(prev => prev.filter(row => !ids.includes(row.id!)));
         // Update parent state to prevent reload
         setDailyProgress(prev => prev.filter(p => !ids.includes(p.id)));
-        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } });
       }
     });
   };
 
   // --- SELECTION & LOAD ---
+  const STORAGE_KEY_SELECTED_PAGE = 'pln_selected_page_id';
+
+  // Save selected page to localStorage whenever it changes
+  useEffect(() => {
+    if (selectedPageId !== null) {
+      localStorage.setItem(STORAGE_KEY_SELECTED_PAGE, selectedPageId.toString());
+    }
+  }, [selectedPageId]);
+
+  // Handle page selection logic when pages load or change
   useEffect(() => {
     if (!Array.isArray(pages) || pages.length === 0) {
       setPreviousPagesLength(0);
       return;
     }
-    
-    // Check if currently selected page still exists
-    const currentPageExists = selectedPageId !== null && pages.some(p => p.id === selectedPageId);
-    
-    if (!currentPageExists) {
-      // Either no selection or current page was deleted - select first page
+
+    // 1. If we already have a valid selection, keep it
+    const isCurrentValid = selectedPageId !== null && pages.some(p => p.id === selectedPageId);
+    if (isCurrentValid) {
+      // Just update length tracker
+      if (pages.length !== previousPagesLength) {
+        setPreviousPagesLength(pages.length);
+      }
+      return;
+    }
+
+    // 2. If no valid selection (e.g. init or deletion), try to recover from localStorage
+    const savedId = localStorage.getItem(STORAGE_KEY_SELECTED_PAGE);
+    const savedIdNum = savedId ? parseInt(savedId) : null;
+    const isSavedValid = savedIdNum !== null && pages.some(p => p.id === savedIdNum);
+
+    if (isSavedValid) {
+      setSelectedPageId(savedIdNum);
+    } else {
+      // 3. Fallback to first page if nothing else works
       setSelectedPageId(pages[0].id);
     }
-    
+
     // Update pages length tracker
     if (pages.length !== previousPagesLength) {
       setPreviousPagesLength(pages.length);
     }
-  }, [pages]); // Only depend on pages array!
+  }, [pages]); // Only depend on pages array (and internal state refs)
 
   const selectedPage = Array.isArray(pages) ? pages.find(p => p.id === selectedPageId) : undefined;
 
@@ -541,7 +565,7 @@ export default function PageTab({
         title={confirmDialog.title}
         message={confirmDialog.message}
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} })}
+        onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } })}
       />
     </div>
   );
