@@ -70,6 +70,23 @@ export async function uploadFile(file: Buffer, key: string, contentType: string)
 }
 
 /**
+ * Dedicated client for generating Presigned URLs for the BROWSER.
+ * This client is configured with 'localhost' (or external domain) so that
+ * the generated signature matches the Host header sent by the browser.
+ * 
+ * Note: Signing is an offline operation, so this client doesn't need network access to localhost.
+ */
+const signingS3Client = new S3Client({
+  endpoint: 'http://10.20.0.141:9000', // External/Browser endpoint (WiFi-Ready)
+  region: S3_CONFIG.region,
+  credentials: {
+    accessKeyId: S3_CONFIG.accessKeyId,
+    secretAccessKey: S3_CONFIG.secretAccessKey,
+  },
+  forcePathStyle: S3_CONFIG.forcePathStyle,
+});
+
+/**
  * Get presigned URL for file download/view
  * @param key - S3 object key
  * @param expiresIn - URL expiration in seconds (default: 1 hour)
@@ -81,7 +98,10 @@ export async function getFileUrl(key: string, expiresIn: number = 3600): Promise
     Key: key,
   });
 
-  const url = await getSignedUrl(s3Client, command, { expiresIn });
+  // Use the SIGNING client to generate the URL
+  // This ensures the signature is calculated for 'localhost:9000', not 'minio:9000'
+  const url = await getSignedUrl(signingS3Client, command, { expiresIn });
+
   return url;
 }
 

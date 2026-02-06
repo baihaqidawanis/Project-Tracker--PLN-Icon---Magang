@@ -1,211 +1,97 @@
-# PLN Icon Plus - Partnership Project Tracker
+# 📊 PLN Icon Plus - Project Tracker
 
-Modern web application for tracking partnership projects with comprehensive CRUD operations, file management, and analytics.
+A comprehensive project tracking and reporting dashboard tailored for PLN Icon Plus workflows. Features real-time collaboration, pivot reporting, and specialized tracking modules.
 
-## 🚀 Quick Deploy (For DevOps)
+## 🌟 Key Features
+- **Project Board**: Multi-view project tracking (List, KPI, Status).
+- **Pivot Report**: Dynamic data aggregation and pivoting.
+- **Partnership Management**: Specialized workflow tracking with drag-and-drop.
+- **Daily Progress**: Granular progress tracking.
+- **Role-based Access**: Admin and User roles (NextAuth.js).
+- **File Management**: Integrated with MinIO/S3 for evidence uploads.
 
-**Deploy in 3 commands:**
+---
 
-### Linux/Mac:
+## 🚀 Getting Started (Local Development)
 
+### Prerequisites
+- Node.js 18+
+- PostgreSQL (Local or Docker)
+- pnpm (recommended) or npm
+
+### Installation
+
+1.  **Clone Repository**
+    ```bash
+    git clone <repo_url>
+    cd plnprojecttracker
+    ```
+
+2.  **Install Dependencies**
+    ```bash
+    pnpm install
+    # or
+    npm install
+    ```
+
+3.  **Setup Environment**
+    Copy `.env.example` to `.env` and configure your database credentials.
+
+4.  **Database Setup**
+    ```bash
+    # Push schema to DB
+    npx prisma db push
+    
+    # Seed Master Data
+    npm run seed
+    
+    # Create Admin User
+    node scripts/create-admin.js admin@plniconplus.com admin123 "Admin Dev"
+    ```
+
+5.  **Run Development Server**
+    ```bash
+    npm run dev
+    ```
+    Access at `http://localhost:3000`
+
+---
+
+## 🐳 Deployment (Docker)
+
+For production deployment instructions, please refer to [DEPLOYMENT.md](DEPLOYMENT.md).
+
+Quick command:
 ```bash
-cp .env.production.example .env  # Edit values
-./deploy-production.sh           # Deploy
-```
-
-### Windows:
-
-```powershell
-Copy-Item .env.production.example .env  # Edit values
-.\deploy-production.ps1                  # Deploy
-```
-
-**📖 Full Guide:** See [QUICKSTART.md](./QUICKSTART.md)
-
----
-
-## 🐳 Docker Deployment & Seeding (Specific for DevOps)
-
-For manual Docker setup or troubleshooting, follow these specific seeding steps:
-
-1. **Build & Start Containers:**
-   ```bash
-   docker compose up -d --build
-   ```
-
-2. **🌱 Seeding Master Data (MANDATORY):**
-   Run this command explicitly to populate Master Data (Branch, Status, etc). **The app will not function correctly without this.**
-   ```bash
-   docker exec plnprojecttracker-app node prisma/seed.js
-   ```
-
-3. **👤 Create First Admin (Optional):**
-   If you need to create an initial admin account manually:
-   ```bash
-   # Usage: node scripts/create-admin.js <email> <password> <name>
-   docker exec plnprojecttracker-app node scripts/create-admin.js admin@plniconplus.com admin123 "Admin User"
-   ```
-
----
-
-## ✨ Features
-
-- 📊 Multi-tab project tracking (Partnership, Page, PKR Opex, Master)
-- 📈 Real-time analytics with pivot tables
-- 📁 File upload with S3/MinIO storage
-- 👥 User authentication & authorization
-- 🎨 Dark mode support
-- 📱 Responsive design
-- 🔄 Undo/Redo functionality
-- 📊 Export to Excel
-- 🔍 Advanced filtering & sorting
-
----
-
-## 🛠️ Tech Stack
-
-- **Frontend:** Next.js 15, React 19, TypeScript, TailwindCSS
-- **Backend:** Next.js API Routes, Prisma ORM
-- **Database:** PostgreSQL
-- **Storage:** MinIO (S3-compatible)
-- **Auth:** NextAuth.js
-- **Testing:** Playwright (37 E2E tests)
-
----
-
-## 📦 Architecture
-
-```
-┌─────────────────┐
-│   Next.js App   │  ← Port 3000
-└────────┬────────┘
-         │
-    ┌────┴─────┬──────────┐
-    ▼          ▼          ▼
-┌────────┐ ┌──────┐ ┌────────┐
-│Postgres│ │MinIO │ │ Redis  │
-│  :5432 │ │ :9000│ │ (opt)  │
-└────────┘ └──────┘ └────────┘
+docker compose up -d --build
 ```
 
 ---
 
 ## 🧪 Testing
 
-**37 E2E Tests** covering:
-
-- ✅ Authentication (login, logout, sessions)
-- ✅ CRUD operations (all tabs)
-- ✅ File upload/download
-- ✅ Navigation & UI
-- ✅ Text input validation
+We use **Playwright** for End-to-End testing.
 
 ```bash
 # Run all tests
-pnpm playwright test
+npm run test
 
-# Run specific test
-pnpm playwright test auth
-
-# UI mode
-pnpm test:ui
+# Run specific test file
+npx playwright test tests/e2e/auth.spec.ts
 ```
 
-**All tests pass ✅** (verified Feb 2026)
+*Ensure your local database has the test user (`admin@plniconplus.com`) seeded before running tests.*
 
 ---
 
-## 🔧 Development
+## 📁 Project Structure
 
-```bash
-# Install dependencies
-pnpm install
-
-# Setup database
-npx prisma migrate dev
-npx prisma generate
-
-# Seed admin user
-npx tsx prisma/seed-user.ts
-
-# Run dev server
-pnpm dev
-
-# Build for production
-pnpm build
-
-# Start production
-pnpm start
-```
-
-**Default Admin:** admin123@plniconplus.com / admin123
+- `/app` - Next.js App Router pages and API routes.
+- `/components` - Reusable UI components.
+- `/prisma` - Database schema and seed scripts.
+- `/scripts` - Utility scripts (create-admin, etc).
+- `/tests` - E2E tests.
 
 ---
 
-## 📂 Project Structure
-
-```
-plnprojecttracker/
-├── app/                    # Next.js app directory
-│   ├── api/               # API routes
-│   ├── components/        # React components
-│   ├── lib/              # Utilities
-│   └── types/            # TypeScript types
-├── prisma/               # Database schema & migrations
-├── tests/                # E2E tests (Playwright)
-├── public/               # Static files
-├── docker-compose.yml    # Docker orchestration
-├── Dockerfile           # Production Docker image
-└── DEPLOYMENT.md        # Detailed deployment guide
-```
-
----
-
-## 🌐 Deployment Options
-
-### Option 1: Docker (Recommended)
-
-✅ **Fastest** - Use deployment scripts above
-
-### Option 2: Vercel
-
-```bash
-vercel --prod
-```
-
-**Note:** Requires external PostgreSQL & MinIO
-
-### Option 3: Manual
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed steps
-
----
-
-## 📊 Environment Variables
-
-See [.env.production.example](./.env.production.example) for full list.
-
-**Required:**
-
-- `DATABASE_URL` - PostgreSQL connection
-- `AUTH_SECRET` - Authentication secret
-- `NEXTAUTH_URL` - Application URL
-- `S3_*` - MinIO/S3 credentials
-
----
-
-## 📝 License
-
-Proprietary - PLN Icon Plus © 2026
-
----
-
-## 👥 Support
-
-- **Documentation:** See `docs/` folder
-- **Deployment:** [QUICKSTART.md](./QUICKSTART.md)
-- **Detailed Deployment:** [DEPLOYMENT.md](./DEPLOYMENT.md)
-
----
-
-**Ready to deploy?** → See [QUICKSTART.md](./QUICKSTART.md)
+**PLN Icon Plus IT Team** © 2026
