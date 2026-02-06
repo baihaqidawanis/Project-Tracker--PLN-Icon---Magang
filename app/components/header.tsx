@@ -37,7 +37,7 @@ export default function Header({ darkMode, setDarkMode, sidebarCollapsed, setSid
             >
               <Menu size={20} />
             </button>
-            <img src="/image.png" alt="PLN Icon Plus" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+            
             <div>
               <h1 className="text-xl font-bold text-white leading-tight">PLN Icon Plus</h1>
               <p

@@ -44,7 +44,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <img src="/image.png" alt="PLN Icon Plus" className="w-20 h-20 mx-auto mb-4 rounded-2xl shadow-lg object-contain" />
+          <img src="/image.png" alt="PLN Icon Plus" className="w-20 h-20 mx-auto mb-4 object-contain" />
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">PLN Icon Plus</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">Partnership Project Tracker</p>
         </div>
@@ -66,7 +66,7 @@ export default function LoginPage() {
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 required
-                placeholder="admin123@plniconplus.com"
+                placeholder="Email"
               />
             </div>
 
@@ -106,7 +106,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-6">
-          © 2026 PLN Icon Plus. All rights reserved.
+          © 2026 PLN Icon Plus
         </p>
       </div>
     </div>
