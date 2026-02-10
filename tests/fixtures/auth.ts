@@ -6,8 +6,8 @@ export async function loginAsAdmin(page: Page) {
   // Wait for page compilation to finish
   await page.waitForTimeout(2000);
 
-  await page.locator('input[type="email"]').fill('admin@plniconplus.com');
-  await page.locator('input[type="password"]').fill('admin123');
+  await page.locator('input[type="email"]').fill('admin@pln.co.id');
+  await page.locator('input[type="password"]').fill('123');
   await page.locator('button[type="submit"]').click();
 
   // Wait for redirect and page load

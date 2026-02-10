@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Undo2, Redo2 } from 'lucide-react';
 import { ConfirmDialog } from './ConfirmDialog';
-import { useUndoRedo } from '../hooks/useUndoRedo';
+
 
 interface MasterTabProps {
   masterData: any;
@@ -15,17 +15,17 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
   const [newItemName, setNewItemName] = useState('');
   const [newItemEmail, setNewItemEmail] = useState('');
   const [isAdding, setIsAdding] = useState(false);
-  
+
   // Checkbox multi-select state
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-  
+
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
     message: string;
     onConfirm: () => void;
-  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
 
   const sections = [
     { id: 'prioritas', label: 'Prioritas', data: masterData.prioritas },
@@ -98,12 +98,12 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
         } catch (error) {
           alert('Failed to delete item');
         } finally {
-          setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+          setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } });
         }
       }
     });
   };
-  
+
   // Toggle row selection
   const toggleRowSelection = (id: number) => {
     setSelectedRows(prev => {
@@ -116,7 +116,7 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
       return newSet;
     });
   };
-  
+
   // Select/deselect all rows
   const toggleSelectAll = () => {
     const currentData = currentSection?.data || [];
@@ -126,7 +126,7 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
       setSelectedRows(new Set(currentData.map((item: any) => item.id)));
     }
   };
-  
+
   // Bulk delete selected rows
   const handleBulkDelete = () => {
     setConfirmDialog({
@@ -141,14 +141,14 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
               method: 'DELETE',
             })
           );
-          
+
           await Promise.all(deletePromises);
           onRefresh();
           setSelectedRows(new Set());
         } catch (error) {
           alert('Failed to delete items');
         } finally {
-          setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+          setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } });
         }
       }
     });
@@ -163,11 +163,10 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
             <button
               key={section.id}
               onClick={() => setActiveSection(section.id)}
-              className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                activeSection === section.id
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${activeSection === section.id
                   ? 'bg-blue-600 text-white dark:bg-blue-700'
                   : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
+                }`}
             >
               {section.label}
             </button>
@@ -216,7 +215,7 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               {currentSection?.label} List
             </h3>
-            
+
             <div className="flex gap-3 items-center">
               {/* Bulk Delete Button */}
               {selectedRows.size > 0 && (
@@ -247,16 +246,15 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
               </label>
             </div>
           )}
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {currentSection?.data?.map((item: any) => (
               <div
                 key={item.id}
-                className={`flex justify-between items-center p-3 rounded-lg border ${
-                  selectedRows.has(item.id)
+                className={`flex justify-between items-center p-3 rounded-lg border ${selectedRows.has(item.id)
                     ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700'
                     : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3 flex-1">
                   <input
@@ -291,7 +289,7 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
           )}
         </div>
       </div>
-      
+
       {/* Confirmation Dialog */}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
@@ -301,7 +299,7 @@ export default function MasterTab({ masterData, onRefresh }: MasterTabProps) {
         cancelText="Cancel"
         confirmButtonClass="bg-red-600 hover:bg-red-700"
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} })}
+        onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } })}
       />
     </div>
   );

@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
+import { requireAuth } from '@/app/lib/auth-guard';
 
 export async function GET() {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const [pics, branches, prioritas, statuses, kodes, bnps, sos, activityTypes] = await Promise.all([
       prisma.masterPIC.findMany({ orderBy: { name: 'asc' } }),
@@ -31,8 +35,15 @@ export async function GET() {
 
 // POST - Add new master data
 export async function POST(request: Request) {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const { type, name, email } = await request.json();
+
+    if (!type || !name) {
+      return NextResponse.json({ error: 'type and name are required' }, { status: 400 });
+    }
 
     let result;
     switch (type) {
@@ -72,6 +83,9 @@ export async function POST(request: Request) {
 
 // DELETE - Delete master data
 export async function DELETE(request: Request) {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
@@ -81,30 +95,35 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Type and ID required' }, { status: 400 });
     }
 
+    const parsedId = parseInt(id);
+    if (isNaN(parsedId)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+    }
+
     switch (type) {
       case 'pics':
-        await prisma.masterPIC.delete({ where: { id: parseInt(id) } });
+        await prisma.masterPIC.delete({ where: { id: parsedId } });
         break;
       case 'branches':
-        await prisma.masterBranch.delete({ where: { id: parseInt(id) } });
+        await prisma.masterBranch.delete({ where: { id: parsedId } });
         break;
       case 'prioritas':
-        await prisma.masterPrioritas.delete({ where: { id: parseInt(id) } });
+        await prisma.masterPrioritas.delete({ where: { id: parsedId } });
         break;
       case 'statuses':
-        await prisma.masterStatus.delete({ where: { id: parseInt(id) } });
+        await prisma.masterStatus.delete({ where: { id: parsedId } });
         break;
       case 'kodes':
-        await prisma.masterKode.delete({ where: { id: parseInt(id) } });
+        await prisma.masterKode.delete({ where: { id: parsedId } });
         break;
       case 'bnps':
-        await prisma.masterBnP.delete({ where: { id: parseInt(id) } });
+        await prisma.masterBnP.delete({ where: { id: parsedId } });
         break;
       case 'sos':
-        await prisma.masterSO.delete({ where: { id: parseInt(id) } });
+        await prisma.masterSO.delete({ where: { id: parsedId } });
         break;
       case 'activityTypes':
-        await prisma.masterActivityType.delete({ where: { id: parseInt(id) } });
+        await prisma.masterActivityType.delete({ where: { id: parsedId } });
         break;
       default:
         return NextResponse.json({ error: 'Invalid type' }, { status: 400 });

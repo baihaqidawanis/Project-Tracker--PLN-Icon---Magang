@@ -8,7 +8,7 @@ WORKDIR /app
 RUN apt-get update -y && apt-get install -y openssl
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # Copy package files and install ALL dependencies
 COPY package.json pnpm-lock.yaml ./
@@ -32,8 +32,8 @@ RUN pnpm run build
 FROM node:20-slim AS runner
 WORKDIR /app
 
-# Install OpenSSL for Prisma runtime
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+# Install OpenSSL for Prisma runtime and dos2unix for line endings
+RUN apt-get update -y && apt-get install -y openssl dos2unix && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
@@ -52,9 +52,12 @@ COPY --from=builder /app/package.json ./package.json
 # Copy ALL node_modules from builder (includes Prisma client)
 COPY --from=builder /app/node_modules ./node_modules
 
+# Fix line endings for migration files (Critical for Windows hosts)
+RUN find ./prisma -type f -name "*.sql" -exec dos2unix {} +
+
 # Copy entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN dos2unix /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Set proper permissions
 RUN chown -R nextjs:nodejs /app
@@ -71,12 +74,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
     CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 CMD ["node", "server.js"]

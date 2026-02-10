@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
+import { requireAuth } from '@/app/lib/auth-guard';
 
 // GET all pages
 export async function GET() {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const pages = await prisma.page.findMany({
       include: {
@@ -31,50 +35,53 @@ export async function GET() {
 
 // POST new page
 export async function POST(request: Request) {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const data = await request.json();
-    console.log('[API POST] Received data:', data);
 
-    // Create the page
-    const page = await prisma.page.create({
-      data: {
-        pageNumber: data.pageNumber,
-        partnershipName: data.partnershipName,
-      },
-    });
+    if (!data.pageNumber || !data.partnershipName) {
+      return NextResponse.json({ error: 'pageNumber and partnershipName are required' }, { status: 400 });
+    }
 
-    console.log('[API POST] Created page:', page);
+    // Use transaction to ensure both Page and Partnership are created atomically
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the page
+      const page = await tx.page.create({
+        data: {
+          pageNumber: data.pageNumber,
+          partnershipName: data.partnershipName,
+        },
+      });
 
-    // Auto-create or Update Partnership (Project) row
-    try {
-      // We use upsert here to handle cases where a Project with this code might already exist 
-      // (e.g., from a previously deleted Page where the Project row wasn't cleaned up)
-      const project = await prisma.project.upsert({
+      // Auto-create or Update Partnership (Project) row
+      await tx.project.upsert({
         where: { code: data.pageNumber },
         update: {
           namaCalonMitra: data.partnershipName,
-          // Re-activate or reset fields if needed, but primarily we sync the name
         },
         create: {
           code: data.pageNumber,
           namaCalonMitra: data.partnershipName,
         },
       });
-      console.log('[API POST] Auto-synced Partnership row:', project);
-    } catch (projectError) {
-      console.error('[API POST] Failed to auto-sync Partnership row:', projectError);
-      // Don't fail the entire request if Partnership sync fails
-    }
 
-    return NextResponse.json(page);
+      return page;
+    });
+
+    return NextResponse.json(result);
   } catch (error) {
-    console.error('[API POST] Error:', error);
+    console.error('[pages POST]', error);
     return NextResponse.json({ error: 'Failed to create page' }, { status: 500 });
   }
 }
 
 // PUT update page
 export async function PUT(request: Request) {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const data = await request.json();
 
@@ -90,59 +97,66 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    // 1. Fetch existing page to get old values
-    const existingPage = await prisma.page.findUnique({
-      where: { id: parseInt(id) },
-    });
-
-    if (!existingPage) {
-      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+    const parsedId = parseInt(id);
+    if (isNaN(parsedId)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     }
 
-    const oldPageNumber = existingPage.pageNumber;
+    // Use transaction to ensure both Page and Partnership are updated atomically
+    const result = await prisma.$transaction(async (tx) => {
+      // Fetch existing page to get old values
+      const existingPage = await tx.page.findUnique({
+        where: { id: parsedId },
+      });
 
-    // 2. Update the page
-    const page = await prisma.page.update({
-      where: { id: parseInt(id) },
-      data: {
-        pageNumber: data.pageNumber,
-        partnershipName: data.partnershipName,
-      },
-    });
+      if (!existingPage) {
+        throw new Error('PAGE_NOT_FOUND');
+      }
 
-    console.log('[API PUT] Updated page:', page);
+      const oldPageNumber = existingPage.pageNumber;
 
-    // 3. Update corresponding Partnership (Project) row using OLD page number
-    try {
-      const existingProject = await prisma.project.findFirst({
-        where: { code: oldPageNumber }, // Use OLD code to find the project
+      // Update the page
+      const page = await tx.page.update({
+        where: { id: parsedId },
+        data: {
+          pageNumber: data.pageNumber,
+          partnershipName: data.partnershipName,
+        },
+      });
+
+      // Update corresponding Partnership (Project) row using OLD page number
+      const existingProject = await tx.project.findFirst({
+        where: { code: oldPageNumber },
       });
 
       if (existingProject) {
-        await prisma.project.update({
+        await tx.project.update({
           where: { id: existingProject.id },
           data: {
-            code: data.pageNumber, // Update to NEW code
-            namaCalonMitra: data.partnershipName, // Update name
+            code: data.pageNumber,
+            namaCalonMitra: data.partnershipName,
           },
         });
-        console.log('[API PUT] Synced Partnership row from', oldPageNumber, 'to', data.pageNumber);
-      } else {
-        console.warn('[API PUT] No corresponding Partnership found for code:', oldPageNumber);
       }
-    } catch (projectError) {
-      console.error('[API PUT] Failed to update Partnership row:', projectError);
-    }
 
-    return NextResponse.json(page);
-  } catch (error) {
-    console.error('[API PUT] Error:', error);
+      return page;
+    });
+
+    return NextResponse.json(result);
+  } catch (error: any) {
+    if (error.message === 'PAGE_NOT_FOUND') {
+      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+    }
+    console.error('[pages PUT]', error?.message);
     return NextResponse.json({ error: 'Failed to update page' }, { status: 500 });
   }
 }
 
 // DELETE page
 export async function DELETE(request: Request) {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -151,46 +165,46 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    // 1. Fetch page details before deleting to get the PageNumber (Code)
-    const pageToDelete = await prisma.page.findUnique({
-      where: { id: parseInt(id) },
-    });
-
-    if (!pageToDelete) {
-      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+    const parsedId = parseInt(id);
+    if (isNaN(parsedId)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     }
 
-    const pageNumber = pageToDelete.pageNumber;
+    // Use transaction to ensure both Page and Partnership are deleted atomically
+    await prisma.$transaction(async (tx) => {
+      const pageToDelete = await tx.page.findUnique({
+        where: { id: parsedId },
+      });
 
-    // 2. Delete the Page
-    await prisma.page.delete({
-      where: { id: parseInt(id) },
-    });
+      if (!pageToDelete) {
+        throw new Error('PAGE_NOT_FOUND');
+      }
 
-    console.log('[API DELETE] Deleted page:', id, pageNumber);
+      const pageNumber = pageToDelete.pageNumber;
 
-    // 3. Delete the corresponding Partnership (Project) row
-    try {
-      const projectToDelete = await prisma.project.findFirst({
+      // Delete the Page
+      await tx.page.delete({
+        where: { id: parsedId },
+      });
+
+      // Delete the corresponding Partnership (Project) row
+      const projectToDelete = await tx.project.findFirst({
         where: { code: pageNumber },
       });
 
       if (projectToDelete) {
-        await prisma.project.delete({
+        await tx.project.delete({
           where: { id: projectToDelete.id },
         });
-        console.log('[API DELETE] Deleted corresponding Partnership row for code:', pageNumber);
-      } else {
-        console.warn('[API DELETE] No corresponding Partnership found to delete for code:', pageNumber);
       }
-    } catch (projectError) {
-      console.error('[API DELETE] Failed to delete Partnership row:', projectError);
-      // We don't error out the main request if this fails, as the primary action (delete page) succeeded
-    }
+    });
 
     return NextResponse.json({ message: 'Page deleted successfully' });
-  } catch (error) {
-    console.error('[API DELETE] Error:', error);
+  } catch (error: any) {
+    if (error.message === 'PAGE_NOT_FOUND') {
+      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+    }
+    console.error('[pages DELETE]', error?.message);
     return NextResponse.json({ error: 'Failed to delete page' }, { status: 500 });
   }
 }

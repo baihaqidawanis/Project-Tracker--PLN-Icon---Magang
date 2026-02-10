@@ -1,14 +1,27 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
+import { requireAuth } from '@/app/lib/auth-guard';
 
 // GET all daily progress
 export async function GET(request: Request) {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const pageId = searchParams.get('pageId');
 
+    const where: any = {};
+    if (pageId) {
+      const parsedPageId = parseInt(pageId);
+      if (isNaN(parsedPageId)) {
+        return NextResponse.json({ error: 'Invalid pageId' }, { status: 400 });
+      }
+      where.pageId = parsedPageId;
+    }
+
     const dailyProgress = await prisma.dailyProgress.findMany({
-      where: pageId ? { pageId: parseInt(pageId) } : {},
+      where,
       include: {
         page: true,
       },
@@ -25,13 +38,20 @@ export async function GET(request: Request) {
 
 // POST new daily progress
 export async function POST(request: Request) {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const data = await request.json();
-    console.log('[API POST DailyProgress] Received data:', data);
+
+    const parsedPageId = parseInt(data.pageId);
+    if (isNaN(parsedPageId)) {
+      return NextResponse.json({ error: 'Valid pageId is required' }, { status: 400 });
+    }
 
     const progress = await prisma.dailyProgress.create({
       data: {
-        pageId: parseInt(data.pageId),
+        pageId: parsedPageId,
         date: data.date ? new Date(data.date) : null,
         activityType: data.activityType,
         description: data.description,
@@ -45,29 +65,34 @@ export async function POST(request: Request) {
       },
     });
 
-    console.log('[API POST DailyProgress] Created progress:', progress);
     return NextResponse.json(progress);
   } catch (error) {
-    console.error('[API POST DailyProgress] Error:', error);
+    console.error('[daily-progress POST]', error);
     return NextResponse.json({ error: 'Failed to create daily progress' }, { status: 500 });
   }
 }
 
 // PUT update daily progress
 export async function PUT(request: Request) {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const data = await request.json();
-    console.log('[API PUT DailyProgress] Received data:', data);
 
     if (!data.id) {
-      console.error('[API PUT DailyProgress] Missing ID in request');
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+    }
+
+    const parsedId = parseInt(data.id);
+    if (isNaN(parsedId)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     }
 
     // Optimistic locking: Check if data was modified by someone else
     if (data.lastSeenUpdatedAt) {
       const current = await prisma.dailyProgress.findUnique({
-        where: { id: parseInt(data.id) },
+        where: { id: parsedId },
         select: { updatedAt: true }
       });
 
@@ -80,7 +105,7 @@ export async function PUT(request: Request) {
     }
 
     const progress = await prisma.dailyProgress.update({
-      where: { id: parseInt(data.id) },
+      where: { id: parsedId },
       data: {
         date: data.date ? new Date(data.date) : null,
         activityType: data.activityType,
@@ -96,16 +121,18 @@ export async function PUT(request: Request) {
       },
     });
 
-    console.log('[API PUT DailyProgress] Updated progress:', progress);
     return NextResponse.json(progress);
   } catch (error) {
-    console.error('[API PUT DailyProgress] Error:', error);
+    console.error('[daily-progress PUT]', error);
     return NextResponse.json({ error: 'Failed to update daily progress' }, { status: 500 });
   }
 }
 
 // DELETE daily progress
 export async function DELETE(request: Request) {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -114,8 +141,13 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
+    const parsedId = parseInt(id);
+    if (isNaN(parsedId)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+    }
+
     await prisma.dailyProgress.delete({
-      where: { id: parseInt(id) },
+      where: { id: parsedId },
     });
     return NextResponse.json({ message: 'Daily progress deleted successfully' });
   } catch (error) {

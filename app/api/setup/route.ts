@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error('[Setup] Error:', error);
+    console.error('[setup POST] Error creating admin:', error);
     return NextResponse.json(
       { error: 'Failed to create admin user' },
       { status: 500 }
@@ -53,14 +53,13 @@ export async function POST(request: Request) {
   }
 }
 
-// Check if setup is needed
+// Check if setup is needed — only returns boolean, not user count
 export async function GET() {
   try {
     const userCount = await prisma.user.count();
 
     return NextResponse.json({
       setupRequired: userCount === 0,
-      userCount,
     });
   } catch (error) {
     return NextResponse.json(

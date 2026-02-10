@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
+import { requireAuth } from '@/app/lib/auth-guard';
 
 // POST - Backfill Partnership rows for all existing Pages
 export async function POST() {
+    const authResult = await requireAuth();
+    if (!authResult.authorized) return authResult.response;
+
     try {
         // Get all pages
         const pages = await prisma.page.findMany();
@@ -22,7 +26,6 @@ export async function POST() {
                 });
 
                 if (existingProject) {
-                    console.log(`[Backfill] Partnership row already exists for ${page.pageNumber}`);
                     results.skipped++;
                     continue;
                 }
@@ -35,10 +38,8 @@ export async function POST() {
                     },
                 });
 
-                console.log(`[Backfill] Created Partnership row for ${page.pageNumber}`);
                 results.created++;
             } catch (error: any) {
-                console.error(`[Backfill] Error creating Partnership for ${page.pageNumber}:`, error);
                 results.errors.push(`${page.pageNumber}: ${error.message}`);
             }
         }
@@ -49,9 +50,9 @@ export async function POST() {
             results,
         });
     } catch (error: any) {
-        console.error('[Backfill] Error:', error);
+        console.error('[backfill]', error?.message);
         return NextResponse.json(
-            { error: 'Failed to backfill Partnership rows', details: error.message },
+            { error: 'Failed to backfill Partnership rows' },
             { status: 500 }
         );
     }

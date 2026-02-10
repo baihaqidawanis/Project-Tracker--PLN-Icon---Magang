@@ -305,7 +305,7 @@ export default function PageTab({
       isNew: true,
       isDirty: true
     };
-    setProgressRows(prev => [newRow, ...prev].map((row, index) => ({ ...row, sortOrder: index })));
+    setProgressRows(prev => [...prev, newRow].map((row, index) => ({ ...row, sortOrder: index })));
   };
 
   const deleteProgressRow = async (index: number) => {
@@ -403,8 +403,8 @@ export default function PageTab({
 
   const selectedPage = Array.isArray(pages) ? pages.find(p => p.id === selectedPageId) : undefined;
 
-  // Load workflows and progress from props ONLY when selectedPageId changes
-  // Don't depend on workflows/dailyProgress to avoid reload when autosave updates them
+  // Load workflows and progress from props when selectedPageId changes
+  // Also reload when parent data arrives (e.g. after refresh / API fetch completes)
   useEffect(() => {
     if (!selectedPageId) {
       setWorkflowRows([]);
@@ -412,29 +412,37 @@ export default function PageTab({
       return;
     }
 
-    const pageWorkflows = workflows
-      .filter(w => w.pageId === selectedPageId)
-      .map((w: any, index: number) => ({
-        ...w,
-        clientId: w.id ? w.id.toString() : `temp-${index}`,
-        type: w.no ? 'main' : 'sub',
-        isDirty: false,
-        isNew: false
-      }));
+    // Don't overwrite local state if user has unsaved (dirty) edits
+    setWorkflowRows(prev => {
+      const hasDirty = prev.some(r => r.isDirty);
+      if (hasDirty) return prev;
 
-    const pageProgress = dailyProgress
-      .filter(p => p.pageId === selectedPageId)
-      .map((p: any, index: number) => ({
-        ...p,
-        clientId: p.id ? p.id.toString() : `temp-${index}`,
-        date: p.date || '',
-        isDirty: false,
-        isNew: false
-      }));
+      return workflows
+        .filter(w => w.pageId === selectedPageId)
+        .map((w: any, index: number) => ({
+          ...w,
+          clientId: w.id ? w.id.toString() : `temp-${index}`,
+          type: w.no ? 'main' : 'sub',
+          isDirty: false,
+          isNew: false
+        }));
+    });
 
-    setWorkflowRows(pageWorkflows);
-    setProgressRows(pageProgress);
-  }, [selectedPageId]); // ONLY selectedPageId - don't reload when props update!
+    setProgressRows(prev => {
+      const hasDirty = prev.some(r => r.isDirty);
+      if (hasDirty) return prev;
+
+      return dailyProgress
+        .filter(p => p.pageId === selectedPageId)
+        .map((p: any, index: number) => ({
+          ...p,
+          clientId: p.id ? p.id.toString() : `temp-${index}`,
+          date: p.date || '',
+          isDirty: false,
+          isNew: false
+        }));
+    });
+  }, [selectedPageId, workflows.length, dailyProgress.length]);
 
   const pageOptions = Array.isArray(pages)
     ? pages.map(page => ({

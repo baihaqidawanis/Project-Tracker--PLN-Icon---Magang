@@ -30,8 +30,6 @@ A comprehensive project tracking and reporting dashboard tailored for PLN Icon P
 2.  **Install Dependencies**
     ```bash
     pnpm install
-    # or
-    npm install
     ```
 
 3.  **Setup Environment**
@@ -41,19 +39,26 @@ A comprehensive project tracking and reporting dashboard tailored for PLN Icon P
     ```bash
     # Push schema to DB
     npx prisma db push
-    
+
     # Seed Master Data
-    npm run seed
-    
-    # Create Admin User
-    node scripts/create-admin.js admin@plniconplus.com admin123 "Admin Dev"
+    npx prisma db seed
     ```
 
 5.  **Run Development Server**
     ```bash
-    npm run dev
+    pnpm dev
     ```
     Access at `http://localhost:3000`
+
+6.  **Create Admin User**
+
+    After the dev server is running, create the first admin user:
+    ```bash
+    curl -X POST http://localhost:3000/api/setup \
+      -H "Content-Type: application/json" \
+      -d '{"name": "Admin", "email": "admin@pln.co.id", "password": "yourpassword"}'
+    ```
+    > ⚠️ Only administrators should have access to this endpoint. The endpoint is disabled once a user exists.
 
 ---
 
@@ -74,23 +79,22 @@ We use **Playwright** for End-to-End testing.
 
 ```bash
 # Run all tests
-npm run test
+npx playwright test
 
 # Run specific test file
 npx playwright test tests/e2e/auth.spec.ts
 ```
 
-*Ensure your local database has the test user (`admin@plniconplus.com`) seeded before running tests.*
+*Ensure your local database has the test user (`admin@pln.co.id` / `123`) seeded before running tests via the `/api/setup` endpoint.*
 
 ---
 
 ## 📁 Project Structure
 
 - `/app` - Next.js App Router pages and API routes.
-- `/components` - Reusable UI components.
+- `/app/components` - Reusable UI components.
 - `/prisma` - Database schema and seed scripts.
-- `/scripts` - Utility scripts (create-admin, etc).
-- `/tests` - E2E tests.
+- `/tests` - E2E tests (Playwright).
 
 ---
 

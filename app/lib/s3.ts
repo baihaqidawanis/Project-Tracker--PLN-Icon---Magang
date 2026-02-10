@@ -34,12 +34,10 @@ export const s3Client = new S3Client({
 export async function ensureBucket() {
   try {
     await s3Client.send(new HeadBucketCommand({ Bucket: S3_CONFIG.bucketName }));
-    console.log(`Bucket ${S3_CONFIG.bucketName} exists`);
+    // Bucket exists
   } catch (error: any) {
     if (error.name === 'NotFound') {
-      console.log(`Creating bucket ${S3_CONFIG.bucketName}...`);
       await s3Client.send(new CreateBucketCommand({ Bucket: S3_CONFIG.bucketName }));
-      console.log(`Bucket ${S3_CONFIG.bucketName} created successfully`);
     } else {
       console.error('Error checking bucket:', error);
       throw error;
@@ -65,7 +63,7 @@ export async function uploadFile(file: Buffer, key: string, contentType: string)
   });
 
   await s3Client.send(command);
-  console.log(`File uploaded successfully: ${key}`);
+
   return key;
 }
 
@@ -77,7 +75,7 @@ export async function uploadFile(file: Buffer, key: string, contentType: string)
  * Note: Signing is an offline operation, so this client doesn't need network access to localhost.
  */
 const signingS3Client = new S3Client({
-  endpoint: 'http://10.20.0.141:9000', // External/Browser endpoint (WiFi-Ready)
+  endpoint: process.env.S3_PUBLIC_ENDPOINT || S3_CONFIG.endpoint,
   region: S3_CONFIG.region,
   credentials: {
     accessKeyId: S3_CONFIG.accessKeyId,
@@ -116,7 +114,7 @@ export async function deleteFile(key: string): Promise<void> {
   });
 
   await s3Client.send(command);
-  console.log(`File deleted successfully: ${key}`);
+
 }
 
 /**

@@ -14,8 +14,8 @@ test.describe('Authentication', () => {
     // Wait for page to finish compiling
     await page.waitForTimeout(2000);
 
-    await page.fill('input[type="email"]', 'admin@plniconplus.com');
-    await page.fill('input[type="password"]', 'admin123');
+    await page.fill('input[type="email"]', 'admin@pln.co.id');
+    await page.fill('input[type="password"]', '123');
     await page.click('button[type="submit"]');
 
     // Wait for redirect and page load

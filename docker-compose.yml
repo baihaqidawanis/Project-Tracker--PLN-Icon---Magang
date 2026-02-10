@@ -10,8 +10,8 @@ services:
       POSTGRES_DB: ${DB_NAME:-plnprojecttracker}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # Port not exposed externally — app connects via internal Docker network
+    # To access DB from host, use: docker-compose exec postgres psql -U plnuser -d plnprojecttracker
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-plnuser} -d ${DB_NAME:-plnprojecttracker}"]
       interval: 10s
@@ -36,9 +36,11 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${DB_USER:-plnuser}:${DB_PASSWORD:-plnpassword}@postgres:5432/${DB_NAME:-plnprojecttracker}
       - AUTH_SECRET=${AUTH_SECRET}
-      - NEXTAUTH_URL=http://10.20.0.141:3000
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
       # MinIO/S3 Configuration
       - S3_ENDPOINT=http://minio:9000
+      - S3_PUBLIC_ENDPOINT=${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+      - S3_IMAGE_HOSTNAME=${S3_IMAGE_HOSTNAME:-localhost}
       - S3_ACCESS_KEY=${S3_ACCESS_KEY:-minioadmin}
       - S3_SECRET_KEY=${S3_SECRET_KEY:-minioadmin123}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-plnprojecttracker}

@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
+import { requireAuth } from '@/app/lib/auth-guard';
 
 // GET all projects
 export async function GET() {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const projects = await prisma.project.findMany({
       include: {
@@ -23,6 +27,9 @@ export async function GET() {
 
 // POST new project
 export async function POST(request: Request) {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     let data;
     try {
@@ -65,7 +72,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(project);
   } catch (error) {
-    console.error(error);
+    console.error('[projects POST]', error);
     return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });
   }
 }

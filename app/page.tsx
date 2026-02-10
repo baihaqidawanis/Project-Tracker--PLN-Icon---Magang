@@ -115,16 +115,19 @@ export default function ProjectTracker() {
   // Re-fetch data when tab changes
   useEffect(() => {
     if (activeTab === 'pkr-opex') {
-      fetch('/api/pkr-opex').then(r => r.json()).then(setPkrOpex).catch(console.error);
+      fetch('/api/pkr-opex').then(r => { if (!r.ok) throw new Error('Failed to fetch'); return r.json(); }).then(setPkrOpex).catch(console.error);
     }
     if (activeTab === 'partnership' || activeTab === 'pivot') {
       Promise.all([fetch('/api/projects'), fetch('/api/pages'), fetch('/api/workflows')])
-        .then(responses => Promise.all(responses.map(r => r.json())))
+        .then(responses => {
+          responses.forEach(r => { if (!r.ok) throw new Error(`Fetch failed: ${r.status}`); });
+          return Promise.all(responses.map(r => r.json()));
+        })
         .then(([p, pg, w]) => { setProjects(p); setPages(pg); setWorkflows(w); })
         .catch(console.error);
     }
     if (activeTab === 'pivot' || activeTab === 'report') {
-      fetch('/api/projects').then(r => r.json()).then(setProjects).catch(console.error);
+      fetch('/api/projects').then(r => { if (!r.ok) throw new Error('Failed to fetch'); return r.json(); }).then(setProjects).catch(console.error);
     }
   }, [activeTab]);
 
@@ -138,7 +141,7 @@ export default function ProjectTracker() {
     const fetchAllData = async () => {
       setLoading(true);
       try {
-        const [projectsRes, pagesRes, workflowsRes, progressRes, pkrRes, masterRes] = await Promise.all([
+        const responses = await Promise.all([
           fetch('/api/projects'),
           fetch('/api/pages'),
           fetch('/api/workflows'),
@@ -147,14 +150,16 @@ export default function ProjectTracker() {
           fetch('/api/master')
         ]);
 
-        const [projectsData, pagesData, workflowsData, progressData, pkrData, masterData] = await Promise.all([
-          projectsRes.json(),
-          pagesRes.json(),
-          workflowsRes.json(),
-          progressRes.json(),
-          pkrRes.json(),
-          masterRes.json()
-        ]);
+        // Check all responses are OK before parsing
+        for (const res of responses) {
+          if (!res.ok) {
+            throw new Error(`API request failed: ${res.url} returned ${res.status}`);
+          }
+        }
+
+        const [projectsData, pagesData, workflowsData, progressData, pkrData, masterData] = await Promise.all(
+          responses.map(r => r.json())
+        );
 
         setProjects(projectsData);
         setPages(pagesData);
@@ -170,6 +175,7 @@ export default function ProjectTracker() {
     };
     fetchAllData();
   }, [status]); // Add status dependency
+
 
   // Sync handler for PageTab unmount - updates parent state with latest child data
   const handlePageTabSync = useCallback((pageId: number, workflowsData: any[], progressData: any[]) => {

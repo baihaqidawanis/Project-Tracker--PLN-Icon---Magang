@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, ClipboardEvent } from 'react';
 import { Plus, Trash2, ZoomIn, ZoomOut, GripVertical, Loader2, CheckCircle, Upload, Eye, X } from 'lucide-react';
 import { ConfirmDialog } from './ConfirmDialog';
-import { useUndoRedo } from '../hooks/useUndoRedo';
+
 import {
   DndContext,
   closestCenter,
@@ -1054,8 +1054,12 @@ export default function PKROpexTab({
                                     </button>
 
                                     {/* Show filename */}
-                                    <span className="text-xs truncate flex-1 dark:text-gray-300" title={row.evidence}>
-                                      {row.evidence.split('/').pop()}
+                                    <span className="text-xs truncate flex-1 dark:text-gray-300" title={row.evidence.split('?')[0].split('/').pop()}>
+                                      {(() => {
+                                        const raw = row.evidence.split('?')[0].split('/').pop() || '';
+                                        // Remove timestamp-random prefix (e.g. "1770700808509-b3chom-")
+                                        return raw.replace(/^\d+-[a-z0-9]+-/, '');
+                                      })()}
                                     </span>
                                   </>
                                 )}

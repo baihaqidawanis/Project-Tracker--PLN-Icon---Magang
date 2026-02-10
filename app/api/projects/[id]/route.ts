@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
+import { requireAuth } from '@/app/lib/auth-guard';
 
 export async function GET(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const params = await props.params;
     const id = parseInt(params.id);
@@ -35,6 +39,9 @@ export async function PUT(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const params = await props.params;
     const id = parseInt(params.id);
@@ -78,7 +85,7 @@ export async function PUT(
     // Prepare update data
     const updateData: any = {
       code: data.code,
-      kode: data.kode, // Added missing field
+      kode: data.kode,
       branchId: parseId(data.branchId),
       namaCalonMitra: data.namaCalonMitra,
       prioritasId: parseId(data.prioritasId),
@@ -91,16 +98,11 @@ export async function PUT(
       linkDokumen: data.linkDokumen,
       latestActivity: data.latestActivity,
       latestActivityStatusId: parseId(data.latestActivityStatusId),
-      lastEditedBy: data.userEmail || null, // Track who edited
+      lastEditedBy: data.userEmail || null,
     };
 
-    // Try to add sortOrder if supported
     if (data.sortOrder !== undefined) {
-      try {
-        updateData.sortOrder = data.sortOrder;
-      } catch (e) {
-        console.warn('sortOrder field not yet supported, skipping');
-      }
+      updateData.sortOrder = data.sortOrder;
     }
 
     const project = await prisma.project.update({
@@ -115,11 +117,9 @@ export async function PUT(
     });
     return NextResponse.json(project);
   } catch (error: any) {
-    console.error('Error updating project:', error);
-    if (error.stack) console.error('Error stack:', error.stack);
+    console.error('[projects PUT]', error?.message);
     return NextResponse.json({
-      error: 'Failed to update project',
-      details: error.message
+      error: 'Failed to update project'
     }, { status: 500 });
   }
 }
@@ -128,6 +128,9 @@ export async function DELETE(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   try {
     const params = await props.params;
     const id = parseInt(params.id);

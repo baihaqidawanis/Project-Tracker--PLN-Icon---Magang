@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, ClipboardEvent } from 'react';
 import { Plus, Trash2, GripVertical, ZoomIn, ZoomOut, Maximize2, Minimize2, CheckCircle, Loader2 } from 'lucide-react';
 import { ConfirmDialog } from './ConfirmDialog';
-import { useUndoRedo } from '../hooks/useUndoRedo';
+
 import {
   DndContext,
   closestCenter,
@@ -158,17 +158,17 @@ export default function PartnershipTab({
   const [rows, setRows] = useState<PartnershipRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
-  
+
   // Checkbox multi-select state
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-  
+
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
     message: string;
     onConfirm: () => void;
-  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Ref for save-on-unmount
@@ -276,7 +276,7 @@ export default function PartnershipTab({
 
     // Calculate from workflow sub-tasks progress (matches TOTAL Progress% in PageTab)
     const pageWorkflows = workflows.filter(w => w.pageId === page.id);
-    
+
     if (code === 'P.01') {
       console.log(`[${code}] DEBUG calculateProgress:`, {
         pageFound: page.pageNumber,
@@ -301,7 +301,7 @@ export default function PartnershipTab({
         }))
       });
     }
-    
+
     if (pageWorkflows.length === 0) return 0;
 
     // Sum dari progress. Fallback: kalau progress = 0 dan status = Done, pakai bobot
@@ -313,11 +313,11 @@ export default function PartnershipTab({
       }
       return sum + progressValue;
     }, 0);
-    
+
     if (code === 'P.01') {
       console.log(`[${code}] Total Progress:`, totalProgress);
     }
-    
+
     return totalProgress;
   };
 
@@ -401,10 +401,10 @@ export default function PartnershipTab({
 
   // Load data into editable state with auto-calculations
   useEffect(() => {
-    console.log('useEffect triggered:', { 
-      projects: projects?.length, 
-      workflows: workflows?.length, 
-      pages: pages?.length 
+    console.log('useEffect triggered:', {
+      projects: projects?.length,
+      workflows: workflows?.length,
+      pages: pages?.length
     });
 
     if (!projects || !Array.isArray(projects)) {
@@ -431,10 +431,10 @@ export default function PartnershipTab({
 
       // Always re-calculate progress to ensure it's fresh
       const currentProgress = calculateProgress(code);
-      
+
       // ALWAYS gunakan currentProgress dari workflows (langsung dari kolom Progress% total)
       const finalProgress = currentProgress;
-      
+
       if (code === 'P.01') {
         console.log(`[${code}] finalProgress yang akan diset:`, finalProgress);
       }
@@ -495,7 +495,7 @@ export default function PartnershipTab({
     });
 
     setRows(sorted);
-    
+
     // Debug: check state after setRows
     const p01Row = sorted.find(r => r.code === 'P.01');
     if (p01Row) {
@@ -505,7 +505,7 @@ export default function PartnershipTab({
         isDirty: p01Row.isDirty
       });
     }
-    
+
     // Trigger auto-save jika ada row yang berubah (untuk save auto-calculated fields ke DB)
     const hasDirtyRows = sorted.some(row => row.isDirty);
     if (hasDirtyRows) {
@@ -724,11 +724,11 @@ export default function PartnershipTab({
           newSet.delete(row.clientId);
           return newSet;
         });
-        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } });
       }
     });
   };
-  
+
   // Bulk delete selected rows
   const deleteBulk = () => {
     setConfirmDialog({
@@ -737,22 +737,22 @@ export default function PartnershipTab({
       message: `Are you sure you want to delete ${selectedRows.size} selected row(s)? This action cannot be undone.`,
       onConfirm: async () => {
         const rowsToDelete = rows.filter(row => selectedRows.has(row.clientId));
-        
+
         // Delete from backend
         for (const row of rowsToDelete) {
           if (row.id) {
             await onDelete('project', row.id);
           }
         }
-        
+
         // Remove from state
         setRows(prev => prev.filter(row => !selectedRows.has(row.clientId)));
         setSelectedRows(new Set());
-        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+        setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } });
       }
     });
   };
-  
+
   // Toggle row selection
   const toggleRowSelection = (clientId: string) => {
     setSelectedRows(prev => {
@@ -765,7 +765,7 @@ export default function PartnershipTab({
       return newSet;
     });
   };
-  
+
   // Select/deselect all rows
   const toggleSelectAll = () => {
     if (selectedRows.size === rows.length) {
@@ -1039,7 +1039,7 @@ export default function PartnershipTab({
               Delete Selected ({selectedRows.size})
             </button>
           )}
-          
+
           {/* Zoom Controls */}
           <div className="flex items-center gap-2">
             <button
@@ -1301,9 +1301,9 @@ export default function PartnershipTab({
                             <div className="w-full px-2 py-1">
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 h-6 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                  <div 
+                                  <div
                                     className="h-full transition-all duration-300"
-                                    style={{ 
+                                    style={{
                                       width: `${Math.min(100, Math.max(0, row.progressPercentage || 0))}%`,
                                       backgroundColor: '#2563eb'
                                     }}
@@ -1403,14 +1403,14 @@ export default function PartnershipTab({
           </div>
         </div>
       </div>
-      
+
       {/* Confirmation Dialog */}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         title={confirmDialog.title}
         message={confirmDialog.message}
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => {} })}
+        onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: () => { } })}
       />
     </div>
   );

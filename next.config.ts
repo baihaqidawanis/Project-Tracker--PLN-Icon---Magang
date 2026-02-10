@@ -4,14 +4,18 @@ const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployment
   // Uncomment for Docker build, comment out for local pnpm start
   output: process.env.DOCKER_BUILD === 'true' ? 'standalone' : undefined,
-  
+
   // Optimize images for production
   images: {
     unoptimized: false,
     remotePatterns: [
       {
+        protocol: 'http',
+        hostname: process.env.S3_IMAGE_HOSTNAME || 'localhost',
+      },
+      {
         protocol: 'https',
-        hostname: '**',
+        hostname: process.env.S3_IMAGE_HOSTNAME || 'localhost',
       },
     ],
   },
