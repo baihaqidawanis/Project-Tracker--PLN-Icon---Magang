@@ -15,13 +15,13 @@ interface DateDisplayInputProps {
 /**
  * DateDisplayInput - shows "dd MMM" when not focused, date picker when focused
  */
-export default function DateDisplayInput({ 
-  value, 
-  onChange, 
-  onFocus, 
-  onPaste, 
-  className, 
-  style 
+export default function DateDisplayInput({
+  value,
+  onChange,
+  onFocus,
+  onPaste,
+  className,
+  style
 }: DateDisplayInputProps) {
   const [isFocused, setIsFocused] = useState(false);
 
@@ -38,7 +38,7 @@ export default function DateDisplayInput({
     return (
       <input
         type="date"
-        value={value}
+        value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
         onBlur={handleBlur}
         onPaste={onPaste}
