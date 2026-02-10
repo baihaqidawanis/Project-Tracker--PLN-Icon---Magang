@@ -6,7 +6,9 @@ export const metadata: Metadata = {
   title: "PLN Icon Plus - Project Tracker",
   description: "Partnership Project Tracker System",
   icons: {
-    icon: '/image.png',
+    icon: '/icon.png',
+    shortcut: '/icon.png',
+    apple: '/icon.png',
   },
 };
 
